@@ -44,6 +44,18 @@ class GuardrailTemplate(BaseModel):
     selectors: Selectors = Field(default_factory=Selectors)
     params: list[str] = Field(default_factory=list)
     body: str = Field(min_length=1)
+    # executable truth for hook/pre-commit surfaces (verifiable, agent-independent)
+    command: str = ""
+    verify: VerifySpec | None = None
+
+
+class VerifySpec(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    tools: list[str] = Field(default_factory=list)   # must resolve on PATH
+    blocking: bool = False                           # exits nonzero on a violation
+    input: str = "none"                              # file | none | git-staged
+    benign: str = ""                                 # fixture that MUST pass (exit 0)
+    violation: str = ""                              # fixture that MUST be caught
 
 
 class RenderedGuardrail(BaseModel):
@@ -56,6 +68,8 @@ class RenderedGuardrail(BaseModel):
     content: str
     markers: list[str] = Field(default_factory=list)  # risqlet:<risk>:<barrier>:<template>
     risks: list[str] = Field(default_factory=list)
+    command: str = ""                                 # rendered executable command
+    verify: VerifySpec | None = None
 
     def dedupe_key(self) -> tuple:
         param_items = tuple(sorted((k, tuple(v)) for k, v in self.params.items()))

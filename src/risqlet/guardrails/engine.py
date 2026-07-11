@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -26,6 +27,13 @@ from risqlet.store import Store
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 LOCK_FILE = ".risqlet-guardrails.lock.json"
 HIGH_SEVERITY = 8  # sod-ap-v1 severity >= this (or li impact == 3) is "high"
+
+# Claude Code delivers the tool payload as JSON on stdin (not an env var);
+# pull out the changed file path into a variable the hook command can use.
+CLAUDE_FILE_FROM_STDIN = (
+    "python3 -c 'import json,sys;"
+    'print(json.load(sys.stdin).get("tool_input",{}).get("file_path",""))\' 2>/dev/null'
+)
 
 _ACCEPTED = {Status.ACCEPTED.value, Status.MITIGATING.value}
 
@@ -87,18 +95,39 @@ def _high_severity(risk: Risk) -> bool:
     return False
 
 
-def _render(template: GuardrailTemplate, dirs: list[str]) -> str:
-    body = template.body
-    if "paths" in template.params:
-        body = body.replace("{{paths_case}}", "|".join(f"{d}/*" for d in dirs))
-        body = body.replace("{{paths}}", " ".join(f"{d}/" for d in dirs))
-    return body.rstrip("\n")
+def _detect_test_command(store: Store) -> str | None:
+    root = store.root.parent
+    if (root / "pyproject.toml").exists() or (root / "pytest.ini").exists() \
+            or (root / "tests").is_dir():
+        return "pytest -q"
+    if (root / "package.json").exists():
+        return "npm test"
+    makefile = root / "Makefile"
+    if makefile.exists() and re.search(r"^test:", makefile.read_text(), flags=re.M):
+        return "make test"
+    return None
+
+
+def _render_text(text: str, dirs: list[str], test_command: str | None) -> str:
+    # path globs use *dir/* so they match absolute paths agents pass ('.' -> '*')
+    case = "|".join("*" if d == "." else f"*{d}/*" for d in dirs)
+    text = text.replace("{{paths_case}}", case)
+    text = text.replace("{{paths}}", " ".join(f"{d}/" for d in dirs))
+    if test_command is not None:
+        text = text.replace("{{test-command}}", test_command)
+    return text
+
+
+def _render(template: GuardrailTemplate, dirs: list[str],
+            test_command: str | None = None) -> str:
+    return _render_text(template.body, dirs, test_command).rstrip("\n")
 
 
 @dataclass
 class Plan:
     guardrails: list[RenderedGuardrail] = field(default_factory=list)
     advisories: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
     def by_surface(self) -> dict[str, list[RenderedGuardrail]]:
         out: dict[str, list[RenderedGuardrail]] = {}
@@ -110,6 +139,7 @@ class Plan:
         return {
             "guardrails": [g.model_dump(mode="json") for g in self.guardrails],
             "advisories": self.advisories,
+            "notes": self.notes,
             "summary": {
                 "count": len(self.guardrails),
                 "surfaces": sorted({g.surface for g in self.guardrails}),
@@ -134,6 +164,7 @@ def build_plan(store: Store, min_priority: str | None = None) -> Plan:
 
     deduped: dict[tuple, RenderedGuardrail] = {}
     per_risk: dict[str, list[RenderedGuardrail]] = {}
+    plan_notes: list[str] = []
 
     for risk in sorted(risks, key=lambda r: r.id):
         if str(risk.status) not in _ACCEPTED:
@@ -146,13 +177,24 @@ def build_plan(store: Store, min_priority: str | None = None) -> Plan:
             for template in templates:
                 if not _matches(template, risk, mitigation, refs_m):
                     continue
-                content = _render(template, dirs)
+                test_command = None
+                if "test-command" in template.params:
+                    test_command = _detect_test_command(store)
+                    if test_command is None:
+                        plan_notes.append(
+                            f"{template.id} for {risk.id} skipped — no test command "
+                            f"detected (declare one to enable this Stop guardrail)")
+                        continue
+                content = _render(template, dirs, test_command)
+                command = (_render_text(template.command, dirs, test_command).strip()
+                           if template.command else "")
                 marker = f"risqlet:{risk.id}:{mitigation.barrier}:{template.id}"
                 params = {"paths": dirs} if "paths" in template.params else {}
                 rg = RenderedGuardrail(
                     template_id=template.id, surface=str(template.surface),
                     enforcement=str(template.enforcement), params=params,
                     content=content, markers=[marker], risks=[risk.id],
+                    command=command, verify=template.verify,
                 )
                 key = rg.dedupe_key()
                 if key in deduped:
@@ -166,7 +208,9 @@ def build_plan(store: Store, min_priority: str | None = None) -> Plan:
                     deduped[key] = rg
                     per_risk.setdefault(risk.id, []).append(rg)
 
-    plan = Plan(guardrails=sorted(deduped.values(), key=lambda g: (g.surface, g.template_id)))
+    plan = Plan(
+        guardrails=sorted(deduped.values(), key=lambda g: (g.surface, g.template_id)),
+        notes=plan_notes)
 
     # honesty: a high-severity accepted risk covered only by soft guardrails is not enforced
     for risk in risks:
@@ -226,12 +270,48 @@ def _render_section(plan: Plan) -> str:
     return "\n".join(lines) + "\n"
 
 
+def verify_plan(plan: Plan, cwd: Path) -> list:
+    """Verify every executable (hook/pre-commit) guardrail in a plan."""
+    from risqlet.guardrails.verify import verify_guardrail
+
+    return [verify_guardrail(g, cwd) for g in plan.guardrails if g.verify is not None]
+
+
+def _gate_by_verification(plan: Plan, cwd: Path, force: bool) -> tuple[Plan, list[dict]]:
+    """Drop hooks that fail verification (unless force). Returns (gated_plan, skips)."""
+    from dataclasses import replace
+
+    results = {r.template_id: r for r in verify_plan(plan, cwd)}
+    kept, skips = [], []
+    for g in plan.guardrails:
+        r = results.get(g.template_id)
+        if r is None or r.ok:
+            kept.append(g)
+        elif force:
+            kept.append(g)
+            skips.append({"template_id": g.template_id, "forced": True,
+                          "failed": [c.name for c in r.failed()]})
+        else:
+            skips.append({"template_id": g.template_id, "forced": False,
+                          "failed": [c.name for c in r.failed()],
+                          "detail": "; ".join(c.detail for c in r.failed() if c.detail)})
+    return replace(plan, guardrails=kept), skips
+
+
 def install_plan(store: Store, plan: Plan, target: str, root: Path,
-                 force: bool = False) -> dict:
-    """Write guardrails for a surface/target. Never writes under .risqlet/."""
+                 force: bool = False, verify: bool = True) -> dict:
+    """Write guardrails for a surface/target. Never writes under .risqlet/.
+
+    For live-hook targets (claude-project, pre-commit) each hook is verified in
+    the target environment first; a hook that fails is skipped unless force.
+    """
     root = root.resolve()
     if ".risqlet" in root.parts:
         raise GuardrailError("guardrails must not be installed inside a .risqlet/ register")
+
+    verify_skips: list[dict] = []
+    if verify and target in ("claude-project", "pre-commit"):
+        plan, verify_skips = _gate_by_verification(plan, root, force)
 
     if target in ("agents-md", "path", "pre-commit"):
         dest = (
@@ -267,7 +347,7 @@ def install_plan(store: Store, plan: Plan, target: str, root: Path,
 
     _write_lock(lock_root, plan)
     return {"target": target, "written": str(dest), "guardrails": len(plan.guardrails),
-            "lock": str(_lock_path(lock_root))}
+            "lock": str(_lock_path(lock_root)), "verify_skipped": verify_skips}
 
 
 def _install_claude(root: Path, plan: Plan, force: bool) -> Path:
@@ -287,13 +367,21 @@ def _install_claude(root: Path, plan: Plan, force: bool) -> Path:
     perms["deny"] = [d for d in perms.get("deny", []) if not str(d).startswith("Read(**/.env")]
 
     for g in plan.guardrails:
-        if g.surface == "claude-hook":
+        if g.surface == "claude-hook" and g.command:
             marker = g.markers[0]
-            hooks.setdefault("PostToolUse", []).append({
-                "matcher": "Write|Edit",
-                "hooks": [{"type": "command",
-                           "command": f"true # {marker} ({g.template_id})"}],
-            })
+            file_input = g.verify is not None and g.verify.input == "file"
+            # Claude Code passes the tool payload as JSON on stdin, NOT an env var —
+            # extract tool_input.file_path into RISQLET_HOOK_FILE (empty => hook no-ops safely)
+            prefix = (f"RISQLET_HOOK_FILE=\"$({CLAUDE_FILE_FROM_STDIN})\"; "
+                      if file_input else "")
+            command = f"{prefix}{g.command}  # {marker}"
+            if file_input:  # PostToolUse on writes
+                hooks.setdefault("PostToolUse", []).append({
+                    "matcher": "Write|Edit",
+                    "hooks": [{"type": "command", "command": command}]})
+            else:  # Stop-style hook (no file input)
+                hooks.setdefault("Stop", []).append({
+                    "hooks": [{"type": "command", "command": command}]})
         elif g.surface == "claude-permission":
             perms.setdefault("deny", []).extend(
                 ["Read(**/.env)", "Read(**/.env.*)"])

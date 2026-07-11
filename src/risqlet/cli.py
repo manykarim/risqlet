@@ -433,7 +433,8 @@ def cmd_guardrails_install(args) -> int:
     else:
         target, root = "path", Path(args.target)
     try:
-        result = install_plan(store, build_plan(store), target, root, force=args.force)
+        result = install_plan(store, build_plan(store), target, root,
+                              force=args.force, verify=not args.no_verify)
     except GuardrailError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -441,7 +442,35 @@ def cmd_guardrails_install(args) -> int:
         print(json.dumps(result, indent=2))
     else:
         print(f"installed {result['guardrails']} guardrail(s) -> {result['written']}")
+        for sk in result.get("verify_skipped", []):
+            if sk.get("forced"):
+                print(f"  ! WARNING forced despite failed verification: "
+                      f"{sk['template_id']} ({', '.join(sk['failed'])})")
+            else:
+                print(f"  skipped (failed verification): {sk['template_id']} — "
+                      f"{', '.join(sk['failed'])}: {sk.get('detail', '')}")
     return 0
+
+
+def cmd_guardrails_verify(args) -> int:
+    from risqlet.guardrails import build_plan
+    from risqlet.guardrails.engine import verify_plan
+
+    store = _store(args)
+    root = args.dir or Path.cwd()
+    results = verify_plan(build_plan(store), Path(root))
+    if args.json:
+        print(json.dumps([r.to_dict() for r in results], indent=2))
+    else:
+        if not results:
+            print("no executable (hook/pre-commit) guardrails to verify")
+        for r in results:
+            status = "OK" if r.ok else "FAIL"
+            print(f"{status}  {r.template_id}")
+            for c in r.checks:
+                if not c.passed:
+                    print(f"    ✗ {c.name}: {c.detail}")
+    return 0 if all(r.ok for r in results) else 1
 
 
 def _setup_print_plan(plan) -> None:
@@ -542,7 +571,7 @@ def cmd_setup(args) -> int:
         _setup_print_plan(plan)
         return 1
 
-    result = apply_plan(plan, project_root, force=args.force)
+    result = apply_plan(plan, project_root, force=args.force, verify=not args.no_verify)
     if args.json:
         print(json.dumps(result, indent=2))
     else:
@@ -705,9 +734,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_g_inst = guard_sub.add_parser("install", help="write guardrails for a surface (human-gated)")
     p_g_inst.add_argument("--target", default="agents-md",
                           help="agents-md | claude-project | pre-commit | a file/dir path")
-    p_g_inst.add_argument("--force", action="store_true")
+    p_g_inst.add_argument("--force", action="store_true",
+                          help="install even hooks that fail verification (warns)")
+    p_g_inst.add_argument("--no-verify", action="store_true",
+                          help="skip hook verification (CI-only; the runtime env may differ)")
     _add_common(p_g_inst)
     p_g_inst.set_defaults(func=cmd_guardrails_install)
+    p_g_ver = guard_sub.add_parser(
+        "verify", help="verify installed hooks in this environment (tools, syntax, behavior)")
+    _add_common(p_g_ver)
+    p_g_ver.set_defaults(func=cmd_guardrails_verify)
 
     p_trace = sub.add_parser(
         "trace", help="ingest test results and report mitigation coverage / detection evidence"
@@ -750,6 +786,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_setup.add_argument("--dry-run", action="store_true", help="print the plan, write nothing")
     p_setup.add_argument("--yes", action="store_true", help="apply without confirmation")
     p_setup.add_argument("--force", action="store_true")
+    p_setup.add_argument("--no-verify", action="store_true",
+                         help="skip hook verification (CI-only)")
     p_setup.add_argument("--remove", action="store_true", help="uninstall (reverse the manifest)")
     p_setup.add_argument("--update", action="store_true", help="refresh installed agents")
     p_setup.add_argument("--status", action="store_true", help="show what is installed")

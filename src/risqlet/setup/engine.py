@@ -147,13 +147,27 @@ def _merge_manifest(existing: Manifest, new_entries: list[ManifestEntry],
     return Manifest(risqlet_version=__version__, entries=kept + new_entries)
 
 
-def apply_plan(plan: Plan, project_root: Path, force: bool = False) -> dict:
-    entries = [_apply_action(a, force) for a in plan.actions]
+def apply_plan(plan: Plan, project_root: Path, force: bool = False,
+               verify: bool = True) -> dict:
+    # verify hook components in the target environment before writing them
+    hook_skips = []
+    actions = []
+    if verify:
+        fails = render.verify_setup_hook()
+    else:
+        fails = []
+    for a in plan.actions:
+        if a.method == "json-hooks" and fails and not force:
+            hook_skips.append({"agent": a.agent, "component": a.component,
+                               "reason": "hook failed verification: " + "; ".join(fails)})
+            continue
+        actions.append(a)
+    entries = [_apply_action(a, force) for a in actions]
     existing = read_manifest(plan.scope, project_root)
-    agents = sorted({a.agent for a in plan.actions})
+    agents = sorted({a.agent for a in actions})
     write_manifest(plan.scope, project_root, _merge_manifest(existing, entries, agents))
     return {"installed": len(entries), "agents": agents, "scope": plan.scope,
-            "skipped": [s.model_dump() for s in plan.skipped]}
+            "skipped": [s.model_dump() for s in plan.skipped] + hook_skips}
 
 
 # -- remove --------------------------------------------------------------------

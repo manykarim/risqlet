@@ -109,6 +109,31 @@ def apply_copy_commands(target_dir: Path) -> list[Path]:
     return written
 
 
+# Claude Code passes the tool payload as JSON on stdin (not an env var).
+SETUP_HOOK_COMMAND = (
+    'f="$(python3 -c \'import json,sys;'
+    'print(json.load(sys.stdin).get("tool_input",{}).get("file_path",""))\' 2>/dev/null)"; '
+    'risqlet check --files "$f" --json 2>/dev/null || true')
+SETUP_HOOK_TOOLS = ["risqlet", "python3", "bash"]
+
+
+def verify_setup_hook() -> list[str]:
+    """Preflight the setup check hook; returns a list of failure reasons (empty = ok)."""
+    import shutil
+    import subprocess
+
+    fails = []
+    for tool in SETUP_HOOK_TOOLS:
+        if shutil.which(tool) is None:
+            fails.append(f"{tool} not on PATH")
+    if shutil.which("bash"):
+        rc = subprocess.run(["bash", "-n", "-c", SETUP_HOOK_COMMAND],
+                            capture_output=True).returncode
+        if rc != 0:
+            fails.append("hook command has a syntax error")
+    return fails
+
+
 def apply_json_hooks(path: Path) -> None:
     data = json.loads(path.read_text()) if path.exists() and path.read_text().strip() else {}
     hooks = data.setdefault("hooks", {})
@@ -116,9 +141,7 @@ def apply_json_hooks(path: Path) -> None:
     if not any(HOOK_MARKER in h.get("command", "")
                for e in post for h in e.get("hooks", [])):
         post.append({"matcher": "Write|Edit", "hooks": [{
-            "type": "command",
-            "command": f'risqlet check --files "$CLAUDE_TOOL_FILE_PATH" --json '
-                       f'2>/dev/null || true  {HOOK_MARKER}'}]})
+            "type": "command", "command": f"{SETUP_HOOK_COMMAND}  {HOOK_MARKER}"}]})
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2) + "\n")
 

@@ -1,5 +1,5 @@
 id: lint-format-posttool
-title: Auto lint/format changed files (blocking on lint error)
+title: Lint changed Python files (blocking on error)
 surface: claude-hook
 enforcement: hard
 barriers: [detect]
@@ -7,13 +7,15 @@ selectors:
   aspects: [iso25010.maintainability]
   tags: [quality, style]
 params: []
+command: |
+  f="$RISQLET_HOOK_FILE"; case "$f" in *.py) ruff check --quiet "$f" || { echo 'risqlet: lint errors'; exit 2; } ;; esac; exit 0
+verify:
+  tools: [ruff, bash]
+  blocking: true
+  input: file
+  fixture: probe.py
+  benign: "x = 1\n"
+  violation: "import os, sys\nx=1\n"
 body: |
-  PostToolUse hook (matcher Write|Edit) — run the project formatter/linter on the
-  changed file and block on an unfixable error (adapt the command to your stack):
-  {
-    "matcher": "Write|Edit",
-    "hooks": [{
-      "type": "command",
-      "command": "f=\"$CLAUDE_TOOL_FILE_PATH\"; case \"$f\" in *.py) ruff check --fix \"$f\" || exit 2 ;; esac; exit 0"
-    }]
-  }
+  PostToolUse hook (matcher Write|Edit) — run the linter on the changed Python
+  file and block on an error. risqlet installs the verified command below.

@@ -71,7 +71,8 @@ class TestTemplates:
         add_risk(store, barrier="prevent")
         plan = build_plan(store)
         secret = next(g for g in plan.guardrails if g.template_id == "secret-scan-posttool")
-        assert "src/auth/*" in secret.content  # scoped to the evidence dir, not repo-wide
+        # scoping now lives in the executable command (*dir/* matches absolute paths)
+        assert "*src/auth/*" in secret.command
         assert secret.params["paths"] == ["src/auth"]
 
 

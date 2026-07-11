@@ -1,18 +1,19 @@
 id: coverage-check-stop
-title: Block session end on coverage regression (blocking)
+title: Block session end on failing tests (blocking)
 surface: claude-hook
 enforcement: hard
 barriers: [detect]
 selectors:
   aspects: [iso25010.testability, iso25010.reliability]
   tags: [coverage, tests]
-params: []
+params: [test-command]
+command: |
+  {{test-command}} || { echo 'risqlet: tests failing — resolve before ending'; exit 2; }
+verify:
+  tools: [bash]
+  blocking: false
+  input: none
 body: |
-  Stop hook — refuse to end the session if the test suite is red or coverage
-  fell. Wire it to your project's test command:
-  {
-    "hooks": [{
-      "type": "command",
-      "command": "risqlet trace status --json >/dev/null 2>&1; make test >/dev/null 2>&1 || { echo 'risqlet: tests failing — resolve before ending'; exit 2; }"
-    }]
-  }
+  Stop hook — refuse to end the session while the project's tests are red. risqlet
+  derives the test command from the project ({{test-command}}); if none can be
+  determined, this guardrail is skipped rather than installed broken.

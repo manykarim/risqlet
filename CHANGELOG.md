@@ -6,6 +6,15 @@ All notable changes to risqlet are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Guardrail hooks are now **verified in the target environment** before install
+  (required tools on PATH, shell syntax, benign-passes/violation-caught behaviour,
+  timeout) and install is gated by default (`--no-verify` / `--force` to override);
+  new `risqlet guardrails verify`. Installed Claude Code hooks now carry the
+  **real** command (previously a `true` placeholder) and read the changed file
+  from Claude's stdin JSON payload. `coverage-check-stop` derives the project's
+  test command instead of hardcoding `make test`.
+
 ## [0.1.0] - 2026-07-11
 
 First release. risqlet is an agent-facing risk-analysis, mitigation, and
