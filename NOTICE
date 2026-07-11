@@ -1,0 +1,46 @@
+risqlet
+Copyright 2026 the risqlet contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+The knowledge catalog content under src/risqlet/catalog/packs/ is licensed
+separately under CC BY 4.0 (see LICENSE-CATALOG), authored under the clean-room
+protocol in CLEAN-ROOM.md.
+
+The authoritative, per-pack license and attribution notices are available at
+runtime via `risqlet catalog licenses`. The notices below must accompany any
+redistribution.
+
+--------------------------------------------------------------------------------
+MITRE ATT&CK (the `mitre-attack` pack — opt-in)
+
+ATT&CK(R) and MITRE ATT&CK(R) are registered trademarks of The MITRE
+Corporation. (C) 2015-2026 The MITRE Corporation. This material references the
+names of MITRE ATT&CK Enterprise tactics as facts and is distributed with
+attribution; no ATT&CK technique descriptions or identifiers are reproduced,
+and this project is not affiliated with or endorsed by The MITRE Corporation.
+
+--------------------------------------------------------------------------------
+OWASP (the `owasp-web` pack — opt-in)
+
+Category names follow the OWASP Top Ten web application risk taxonomy, used as
+factual references. No OWASP text is reproduced; all definitions and prompts
+are original. This project is not affiliated with or endorsed by the OWASP
+Foundation.
+
+--------------------------------------------------------------------------------
+Concepts credited (concept sources, not text sources)
+
+The catalog expresses long-established, uncopyrightable concepts in original
+text, crediting the following as the origin of the ideas (never their wording):
+
+  - ISO/IEC 25010:2023 product-quality characteristic names (as facts).
+  - HAZOP guideword method (chemical-process safety practice).
+  - STRIDE threat-category names (Microsoft; Kohnfelder & Garg).
+  - The product-element decomposition Structure/Function/Data/Interfaces/
+    Platform/Operations/Time, from the Heuristic Test Strategy Model
+    (James Bach, with Michael Bolton).
+  - Consistency-oracle heuristics (Michael Bolton and James Bach).
+  - The pre-mortem method (Gary Klein).
+  - Second-order "testing traps" framing (Lena Pejgan Wiberg).
+
+See CLEAN-ROOM.md for the authoring protocol and per-entry provenance.

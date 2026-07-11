@@ -1,0 +1,50 @@
+# qrisk risk re-assessment on pull requests.
+# Validates the register and checks whether the PR touches tracked risks with
+# failing or missing coverage. Uses only first-party actions.
+name: qrisk
+
+on:
+  pull_request:
+    # Narrow with paths: to mirror qrisk's ci_paths filter and cut noise.
+    # paths: ["src/**", "app/**"]
+
+jobs:
+  risk-reassessment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so the base ref is available
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install qrisk
+        run: uv tool install qrisk
+
+      - name: Validate the risk register
+        run: qrisk validate
+
+      - name: Re-assess risks touched by this PR
+        id: check
+        run: |
+          qrisk check --base "origin/${{ github.base_ref }}" --json > qrisk-check.json || true
+          {
+            echo '## qrisk risk re-assessment'
+            echo ''
+            python - <<'PY'
+          import json
+          d = json.load(open("qrisk-check.json"))
+          flags = d.get("flagged", [])
+          if not flags:
+              print("No tracked risks flagged by this change. ✅")
+          else:
+              print(f"Mode: `{d['mode']}` — {len(flags)} flagged:")
+              print()
+              for f in flags:
+                  print(f"- **{f['risk']}** ({f['status']}, {f['priority']}): {f['flag']}")
+                  print(f"  - action: {f['suggested_action']}")
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Gate honors qrisk's ci_gate mode (block => non-zero via the tool).
+          qrisk check --base "origin/${{ github.base_ref }}"

@@ -1,0 +1,46 @@
+# Publish risqlet to PyPI on a version tag, via Trusted Publishing (OIDC).
+#
+# INERT until a maintainer completes one-time setup (see docs/release-checklist.md):
+#   1. the PyPI project `risqlet` is claimed, and
+#   2. a PyPI Trusted Publisher is configured for this repo + this workflow.
+# Until then, tagging will run the build but the publish step will not be
+# authorized. No API token is stored anywhere.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Test
+        run: |
+          uv sync
+          uv run ruff check .
+          uv run pytest
+      - name: Build sdist + wheel
+        run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # required for PyPI Trusted Publishing (OIDC)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

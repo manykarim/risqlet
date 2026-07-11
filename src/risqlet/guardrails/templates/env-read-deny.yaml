@@ -1,0 +1,13 @@
+id: env-read-deny
+title: Deny reading dotenv/secret files
+surface: claude-permission
+enforcement: hard
+barriers: [prevent]
+selectors:
+  aspects: [iso25010.confidentiality]
+  catalog_refs: [owasp-web.cryptographic-failures]
+  tags: [secrets]
+params: []
+body: |
+  permissions.deny entries (keep secrets out of the agent's context):
+  "Read(**/.env)", "Read(**/.env.*)", "Read(**/*secret*)", "Read(**/id_rsa)"

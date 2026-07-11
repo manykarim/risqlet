@@ -1,0 +1,251 @@
+# Heuristics catalog: thinking tools and consistency oracles for risk elicitation
+# and evaluation. Ideas credited per entry; all text original (see CLEAN-ROOM.md).
+id: heuristics
+title: Testing heuristics and oracles
+version: 1
+license: CC-BY-4.0
+attribution: >
+  Original text (c) risqlet contributors, CC BY 4.0. Several entries express
+  oracle heuristics articulated by the context-driven testing school (notably
+  Michael Bolton and James Bach); their published works are credited as
+  concept sources, not reproduced.
+entries:
+  # --- consistency oracles --------------------------------------------------
+  - slug: history-oracle
+    name: Consistency with history
+    kind: heuristic
+    summary: Suspect a problem when the product behaves differently than its
+      own past self without an announced reason — regressions hide in "minor"
+      releases.
+    prompts:
+      - What worked in the previous version that behaves differently now?
+      - Did performance, defaults, or output formats shift without a changelog entry?
+    tags: [oracle, regression, comparison]
+    provenance: Oracle heuristic articulated by Michael Bolton and James Bach
+      (consistency heuristics); text original.
+  - slug: claims-oracle
+    name: Consistency with claims
+    kind: heuristic
+    summary: Compare behavior against everything the organization has said —
+      docs, marketing, contracts, error messages, tooltips. Every claim is a
+      testable promise.
+    prompts:
+      - Which documented claim about this feature has never been verified?
+      - Do the UI text and the actual behavior tell the same story?
+    tags: [oracle, documentation, claims, contract]
+    provenance: Oracle heuristic articulated by Bolton and Bach; text original.
+  - slug: comparable-products-oracle
+    name: Consistency with comparable products
+    kind: heuristic
+    summary: Judge behavior against what similar products do — users arrive
+      with expectations trained elsewhere, and divergence needs a reason.
+    prompts:
+      - How do the two closest competitors handle this same situation?
+      - Where do platform conventions differ from what we built?
+    tags: [oracle, comparison, competitors, conventions]
+    provenance: Oracle heuristic articulated by Bolton and Bach; text original.
+  - slug: user-expectations-oracle
+    name: Consistency with user expectations
+    kind: heuristic
+    summary: Suspect a problem when behavior would surprise a reasonable user —
+      even if it matches the spec. Specs forget; users do not.
+    prompts:
+      - What would a reasonable user expect here, and who checked?
+      - Which support tickets keep asking about this behavior?
+    tags: [oracle, users, expectations, surprise]
+    provenance: Oracle heuristic articulated by Bolton and Bach; text original.
+  - slug: standards-oracle
+    name: Consistency with standards and statutes
+    kind: heuristic
+    summary: Compare behavior against applicable laws, regulations, and industry
+      standards — accessibility rules, privacy law, fiscal requirements —
+      where "works fine" can still be illegal.
+    prompts:
+      - Which law or regulation constrains this feature, and where is that encoded in tests?
+      - What would an auditor ask for that we could not produce?
+    tags: [oracle, compliance, regulation, legal]
+    provenance: Oracle heuristic articulated by Bolton and Bach; text original.
+  - slug: internal-consistency-oracle
+    name: Internal consistency
+    kind: heuristic
+    summary: Suspect a problem when the product contradicts itself — totals
+      that disagree between screens, the same term meaning two things, one flow
+      validating what another accepts.
+    prompts:
+      - Where does the same fact appear twice in the product, and do the values match?
+      - Which validation applies in one entry path but not another?
+    tags: [oracle, consistency, contradiction]
+    provenance: Oracle heuristic articulated by Bolton and Bach; text original.
+  - slug: purpose-oracle
+    name: Consistency with purpose
+    kind: heuristic
+    summary: Judge behavior against why the product exists — a feature can pass
+      every check and still defeat the goal it was built for.
+    prompts:
+      - Does this behavior help or hinder the job the user hired the product to do?
+      - If this feature vanished, what would actually be lost?
+    tags: [oracle, purpose, value, goals]
+    provenance: Oracle heuristic articulated by Bolton and Bach; text original.
+  # --- elicitation and probing heuristics ----------------------------------
+  - slug: zero-one-many
+    name: Zero, one, many
+    kind: heuristic
+    summary: For anything countable, try none, exactly one, and lots — empty
+      lists, single items, and bulk are three different programs wearing one UI.
+    prompts:
+      - What does the screen show with zero items, and is it helpful or broken?
+      - At what count does the list, export, or query become unusable?
+    tags: [counts, collections, empty, bulk]
+    provenance: Classic counting heuristic from the testing folklore; popularized
+      in community cheat sheets; text original.
+  - slug: goldilocks-sizing
+    name: Goldilocks sizing
+    kind: heuristic
+    summary: Feed each input something too small, too large, and just right —
+      length, magnitude, precision, duration — because handling extremes is
+      where assumptions live.
+    prompts:
+      - What is the largest realistic value a power user would enter, times ten?
+      - Which field has a silent truncation or rounding rule nobody documented?
+    tags: [inputs, extremes, size, limits]
+    provenance: Classic input-sizing heuristic; popularized in community cheat
+      sheets; text original.
+    related: [techniques.boundary-value]
+  - slug: boundary-hunting
+    name: Boundary hunting
+    kind: heuristic
+    summary: Actively look for undocumented boundaries — buffer sizes, pagination
+      limits, timeout thresholds, date ranges — the spec only lists the ones
+      someone remembered.
+    prompts:
+      - Which limits exist in the implementation that no requirement mentions?
+      - What changes at midnight, month-end, year-end, or February 29th?
+    tags: [boundaries, limits, dates, discovery]
+    provenance: Classic testing heuristic; no single originator.
+  - slug: interruption-resume
+    name: Interrupt and resume
+    kind: heuristic
+    summary: Break the flow mid-operation — close the laptop, kill the tab, drop
+      the network, take the phone call — and check what survives, resumes, or
+      corrupts.
+    prompts:
+      - What state remains if the process dies between step two and step three?
+      - Does resuming repeat a side effect (payment, email, booking) that already happened?
+    tags: [interruption, resume, crash, state]
+    provenance: Classic robustness heuristic; popularized in community cheat
+      sheets; text original.
+  - slug: resource-starvation
+    name: Resource starvation
+    kind: heuristic
+    summary: Run with too little — disk, memory, quota, battery, bandwidth,
+      file handles — and watch whether the product degrades honestly or fails
+      confusingly.
+    prompts:
+      - What is the first user-visible symptom when the disk fills up?
+      - Does the product distinguish "slow network" from "no network" for the user?
+    tags: [resources, degradation, limits, environment]
+    provenance: Classic robustness heuristic; no single originator.
+  - slug: multi-user-contention
+    name: Multi-user contention
+    kind: heuristic
+    summary: Make several actors touch the same thing at once — edits, bookings,
+      approvals, balances — and check who wins, who is told, and what invariant
+      breaks.
+    prompts:
+      - What happens when two users submit conflicting changes within one second?
+      - Which uniqueness rule is enforced only in the UI, not the database?
+    tags: [concurrency, race-conditions, locking, collaboration]
+    provenance: Classic concurrency heuristic; no single originator.
+  - slug: dependency-variation
+    name: Dependency variation
+    kind: heuristic
+    summary: Assume every dependency will one day be slow, absent, stale, or
+      lying — probe each one's failure modes and the product's reaction to them.
+    prompts:
+      - For each external call - what happens on timeout, error, and wrong-but-valid data?
+      - Which cached value could be stale, and how would anyone know?
+    tags: [dependencies, integration, failure-modes]
+    provenance: Classic integration heuristic; no single originator.
+    related: [techniques.integration-paths]
+  - slug: sequence-shuffling
+    name: Sequence shuffling
+    kind: heuristic
+    summary: Do the steps in the wrong order, repeat them, skip them, and go
+      backwards — real users navigate with the back button, bookmarks, and
+      double-clicks.
+    prompts:
+      - What happens on double-submit of the final step?
+      - Can a bookmarked or shared URL enter the flow past its guards?
+    tags: [sequences, ordering, navigation, idempotency]
+    provenance: Classic flow heuristic; no single originator.
+  - slug: clock-and-timezone
+    name: Clock and timezone play
+    kind: heuristic
+    summary: Move time around — timezone changes, DST transitions, clock skew
+      between machines, leap days, long uptimes — time bugs are boundary bugs
+      wearing trench coats.
+    prompts:
+      - What breaks for a user in another timezone at midnight UTC?
+      - Do any two servers disagree about the time, and does anything depend on them agreeing?
+    tags: [time, timezone, dst, clocks]
+    provenance: Classic time-testing heuristic; no single originator.
+  - slug: configuration-drift
+    name: Configuration variation
+    kind: heuristic
+    summary: Vary the knobs — feature flags, locales, permissions, deployment
+      options — combinations multiply faster than test plans, so pick the risky
+      ones deliberately.
+    prompts:
+      - Which flag combination has never been on in any test environment?
+      - What breaks in a locale with comma decimals, non-Latin script, or right-to-left text?
+    tags: [configuration, flags, locales, combinations]
+    provenance: Classic configuration heuristic; no single originator.
+  - slug: persona-switching
+    name: Persona switching
+    kind: heuristic
+    summary: Re-view the product as different people — the novice, the expert,
+      the impaired user, the hostile actor, the auditor, the API script — each
+      persona finds a different class of problem.
+    prompts:
+      - Which persona has nobody on the team represented while designing this?
+      - What does the hostile persona try first?
+    tags: [personas, perspectives, elicitation]
+    provenance: Persona-based evaluation is established UX/testing practice;
+      text original.
+  - slug: follow-the-data
+    name: Follow the data
+    kind: heuristic
+    summary: Trace one datum end to end — entry, validation, storage, transform,
+      display, export, backup, deletion — and audit what each hop could lose,
+      leak, or mangle.
+    prompts:
+      - Where does this field get truncated, re-encoded, or rounded along its journey?
+      - When the user deletes it, where does it still exist?
+    tags: [data, lineage, tracing, privacy]
+    provenance: Classic data-flow heuristic; no single originator.
+    related: [iso25010.data-integrity, iso25010.confidentiality]
+  - slug: premortem
+    name: Pre-mortem
+    kind: heuristic
+    summary: Assume the release failed spectacularly six months from now and
+      write the story of what happened — prospective hindsight surfaces risks
+      that direct questioning misses.
+    prompts:
+      - It is six months later and this project is a famous failure - what went wrong?
+      - Which early warning sign would we wish we had watched?
+    tags: [elicitation, workshop, prospective-hindsight, planning]
+    provenance: Pre-mortem method by Gary Klein; text original.
+  - slug: test-the-testing
+    name: Test the testing
+    kind: heuristic
+    summary: Point the risk lens at the verification itself — coverage
+      illusions, always-green suites, mocked-away integrations, biased
+      selection — the second-order risks that make first-order risk analysis
+      overconfident.
+    prompts:
+      - Which passing test would still pass if the feature were deleted?
+      - Where do we test a mock so thoroughly that production is the first integration test?
+    tags: [meta, test-quality, bias, second-order]
+    provenance: Second-order risk focus notably developed in Lena Pejgan
+      Wiberg's work on testing traps; concept credited, text original.
+    related: [techniques.mutation-testing]

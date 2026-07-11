@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "EventType": {
+      "enum": [
+        "status_change",
+        "phase_change"
+      ],
+      "title": "EventType",
+      "type": "string"
+    }
+  },
+  "$id": "https://risqlet.dev/schemas/v1/event.schema.json",
+  "additionalProperties": true,
+  "properties": {
+    "from": {
+      "title": "From",
+      "type": "string"
+    },
+    "note": {
+      "default": "",
+      "title": "Note",
+      "type": "string"
+    },
+    "principal": {
+      "pattern": "^(human|agent):.+$",
+      "title": "Principal",
+      "type": "string"
+    },
+    "risk": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Risk"
+    },
+    "to": {
+      "title": "To",
+      "type": "string"
+    },
+    "ts": {
+      "minLength": 1,
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "$ref": "#/$defs/EventType"
+    }
+  },
+  "required": [
+    "ts",
+    "type",
+    "from",
+    "to",
+    "principal"
+  ],
+  "title": "Event",
+  "type": "object"
+}

@@ -1,0 +1,14 @@
+id: complexity-gate-ci
+title: CI complexity gate on risky modules
+surface: ci
+enforcement: hard
+barriers: [detect]
+selectors:
+  aspects: [iso25010.maintainability]
+  tags: [complexity, quality]
+params: [paths]
+body: |
+  CI step — fail the build if cyclomatic complexity rises on the tracked-risk
+  paths {{paths}} (adapt to your linter):
+  - name: complexity gate (risqlet)
+    run: ruff check --select C901 {{paths}}

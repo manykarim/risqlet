@@ -1,0 +1,234 @@
+# Quality-aspect catalog. Characteristic NAMES follow ISO/IEC 25010:2023 as facts;
+# all definitions and prompts are original text (see CLEAN-ROOM.md) and are not
+# the standard's text, nor endorsed by ISO. Consult the standard for normative use.
+id: iso25010
+title: Product quality aspects
+version: 1
+license: CC-BY-4.0
+attribution: >
+  Original text (c) risqlet contributors, CC BY 4.0. Characteristic names follow
+  ISO/IEC 25010:2023 as bibliographic facts; definitions are original and
+  unaffiliated with ISO.
+entries:
+  # --- the nine 2023 characteristics -------------------------------------
+  - slug: functional-suitability
+    name: Functional suitability
+    kind: aspect
+    summary: The product does the right things — the features exist, produce
+      correct results, and actually serve the user's goal rather than merely
+      matching a spec line.
+    prompts:
+      - Which user goal would be missed even if every written requirement passed?
+      - Where could the product return a plausible but wrong answer without anyone noticing?
+    tags: [functionality, correctness, completeness]
+    provenance: Characteristic name from ISO/IEC 25010:2023; definition original.
+  - slug: performance-efficiency
+    name: Performance efficiency
+    kind: aspect
+    summary: The product responds in acceptable time and stays within its
+      resource budget (CPU, memory, storage, network, cost) under its expected
+      and peak workloads.
+    prompts:
+      - What is the slowest operation a real user hits daily, and who decided its budget?
+      - Which resource runs out first as usage grows, and what happens then?
+    tags: [performance, latency, capacity, resources]
+    provenance: Characteristic name from ISO/IEC 25010:2023; definition original.
+  - slug: compatibility
+    name: Compatibility
+    kind: aspect
+    summary: The product coexists with its neighbors — it exchanges data with
+      other systems correctly and does not degrade shared environments it runs in.
+    prompts:
+      - Which external system's format or API version change would break us silently?
+      - What else runs on the same host, cluster, or device and competes with us?
+    tags: [interoperability, integration, coexistence]
+    provenance: Characteristic name from ISO/IEC 25010:2023; definition original.
+  - slug: interaction-capability
+    name: Interaction capability
+    kind: aspect
+    summary: People can learn, operate, and trust the product — including users
+      with impairments, novices, and people having a bad day on a small screen.
+    prompts:
+      - Where does a first-time user get stuck without help?
+      - Which mistake is easy to make and hard to undo in the current UI?
+    tags: [usability, ux, learnability, error-protection]
+    provenance: Characteristic name from ISO/IEC 25010:2023 (formerly Usability);
+      definition original.
+  - slug: reliability
+    name: Reliability
+    kind: aspect
+    summary: The product keeps working — it performs as required over time,
+      tolerates faults, and comes back quickly and completely when it fails.
+    prompts:
+      - What is the longest the product has run in production without restart, and why?
+      - Which single failure would users notice within one minute?
+    tags: [availability, stability, fault-tolerance]
+    provenance: Characteristic name from ISO/IEC 25010:2023; definition original.
+  - slug: security
+    name: Security
+    kind: aspect
+    summary: The product protects data and functions from unauthorized access
+      and manipulation, holds up under deliberate attack, and can prove who did what.
+    prompts:
+      - What is the most valuable thing an attacker could take or change here?
+      - Which action cannot currently be attributed to a specific principal?
+    tags: [confidentiality, integrity, authentication, attack]
+    provenance: Characteristic name from ISO/IEC 25010:2023; definition original.
+  - slug: maintainability
+    name: Maintainability
+    kind: aspect
+    summary: The team can change the product safely and quickly — code and
+      configuration are analyzable, modular, testable, and changes do not
+      ripple unpredictably.
+    prompts:
+      - Which module do developers fear touching, and what makes it scary?
+      - How long from a one-line fix to verified deploy, and what dominates that time?
+    tags: [modifiability, testability, technical-debt]
+    provenance: Characteristic name from ISO/IEC 25010:2023; definition original.
+  - slug: flexibility
+    name: Flexibility
+    kind: aspect
+    summary: The product adapts to new environments and demands — it can be
+      installed, moved, scaled, and reconfigured without redesign.
+    prompts:
+      - What breaks first if we deploy to a new region, OS, or customer environment?
+      - Can capacity be added without downtime, and has anyone tried?
+    tags: [adaptability, scalability, portability, installability]
+    provenance: Characteristic name from ISO/IEC 25010:2023 (formerly Portability);
+      definition original.
+  - slug: safety
+    name: Safety
+    kind: aspect
+    summary: The product avoids harming people, property, or environment —
+      it constrains dangerous operation, fails to a safe state, and warns before
+      hazards materialize.
+    prompts:
+      - What is the worst physical or financial harm a malfunction could cause a person?
+      - When the product must fail, what state does it fail into — and is that state safe?
+    tags: [harm, fail-safe, hazard, risk-identification]
+    provenance: Characteristic name from ISO/IEC 25010:2023 (new in 2023);
+      definition original.
+  # --- high-value sub-aspects ---------------------------------------------
+  - slug: data-integrity
+    name: Data integrity
+    kind: aspect
+    summary: Stored and transmitted data stays correct, complete, and
+      reconcilable — no silent corruption, loss, duplication, or divergence
+      between systems that must agree.
+    prompts:
+      - Which two systems hold the same fact, and how would we notice if they disagreed?
+      - What happens to in-flight data when a process dies mid-operation?
+    tags: [data, consistency, reconciliation, corruption]
+    provenance: Common decomposition of security/reliability concerns; original text.
+  - slug: availability
+    name: Availability
+    kind: aspect
+    summary: The product is up and usable when users need it, measured against
+      an explicit target rather than a hopeful assumption.
+    prompts:
+      - What is the actual availability target, who agreed to it, and what does it exclude?
+      - Which dependency's outage takes us down with it?
+    tags: [uptime, sla, outage]
+    provenance: Reliability sub-concern named in ISO/IEC 25010; definition original.
+  - slug: recoverability
+    name: Recoverability
+    kind: aspect
+    summary: After a failure the product can restore service and data to a known
+      good state within a known time — backups exist, restore is rehearsed, and
+      partial failures do not leave permanent scars.
+    prompts:
+      - When was the last successful restore from backup actually performed?
+      - After a crash mid-transaction, what does the user see and what does the database hold?
+    tags: [backup, restore, disaster-recovery, rto]
+    provenance: Reliability sub-concern named in ISO/IEC 25010; definition original.
+  - slug: fault-tolerance
+    name: Fault tolerance
+    kind: aspect
+    summary: The product keeps delivering (possibly degraded) service when
+      components misbehave — one bad node, dependency, or input does not become
+      a total outage.
+    prompts:
+      - Which component failures are handled gracefully today, and which are assumed away?
+      - What does the product do when a dependency answers slowly rather than not at all?
+    tags: [degradation, resilience, redundancy]
+    provenance: Reliability sub-concern named in ISO/IEC 25010; definition original.
+  - slug: scalability
+    name: Scalability
+    kind: aspect
+    summary: Capacity can grow (and shrink) to meet demand without redesign —
+      and the growth path has actually been exercised, not just diagrammed.
+    prompts:
+      - At what multiple of today's load does the current architecture stop working?
+      - Which component cannot be horizontally scaled, and what is the plan for it?
+    tags: [growth, capacity, elasticity]
+    provenance: Flexibility sub-concern named in ISO/IEC 25010:2023; definition original.
+  - slug: testability
+    name: Testability
+    kind: aspect
+    summary: The product makes it practical to learn the truth about itself —
+      observable outputs, controllable inputs, seams for automation, and
+      environments that resemble production.
+    prompts:
+      - Which behavior can currently only be verified manually, and why?
+      - Can a tester place the system into the interesting states, or only hope to stumble into them?
+    tags: [observability, controllability, automation]
+    provenance: Maintainability sub-concern named in ISO/IEC 25010; low testability
+      as a risk amplifier discussed by Bach & Bolton; definition original.
+  - slug: confidentiality
+    name: Confidentiality
+    kind: aspect
+    summary: Data is visible only to those entitled to it — across storage,
+      transit, logs, backups, error messages, and analytics.
+    prompts:
+      - Where does sensitive data appear outside its primary store (logs, caches, exports)?
+      - Who can read production data today, and would we know if they did?
+    tags: [privacy, secrets, data-protection, gdpr]
+    provenance: Security sub-concern named in ISO/IEC 25010; definition original.
+  - slug: accessibility
+    name: Accessibility
+    kind: aspect
+    summary: People with visual, motor, auditory, or cognitive impairments can
+      use the product — with assistive technology, keyboard only, high zoom, or
+      reduced motion.
+    prompts:
+      - Does every flow work with keyboard only and with a screen reader?
+      - Which color or contrast choice excludes users, and on which real devices?
+    tags: [a11y, wcag, inclusion, assistive-technology]
+    provenance: Interaction-capability sub-concern (inclusivity) in ISO/IEC
+      25010:2023; definition original.
+  - slug: operability
+    name: Operability
+    kind: aspect
+    summary: The people who run the product can deploy, configure, observe,
+      and repair it under pressure — runbooks exist, alerts point at causes,
+      and rollback works.
+    prompts:
+      - At 3 a.m. during an incident, what does the on-call person actually see and do?
+      - Can the current release be rolled back, and when was that last exercised?
+    tags: [operations, deployment, rollback, runbook]
+    provenance: Common operations-quality concern; original text.
+  - slug: install-and-update
+    name: Installation and update
+    kind: aspect
+    summary: The product can be installed, upgraded, migrated, and removed
+      cleanly across its supported environments — including the awkward step
+      from version N-2.
+    prompts:
+      - What happens to user data when an upgrade fails halfway?
+      - Does an upgrade from the oldest supported version still work, and who tests it?
+    tags: [installation, upgrade, migration, packaging]
+    provenance: Flexibility sub-concern (installability) named in ISO/IEC 25010;
+      definition original.
+  - slug: observability
+    name: Observability
+    kind: aspect
+    summary: The product reports enough about its own behavior that failures
+      are detected, located, and understood from telemetry rather than user
+      complaints. A risqlet extension aspect — weak observability inflates every
+      other risk's detection score.
+    prompts:
+      - Would we learn about the last serious bug from monitoring or from a customer?
+      - Which important business operation emits no metric, log, or trace today?
+    tags: [monitoring, telemetry, alerting, detection]
+    provenance: risqlet extension aspect (not an ISO characteristic); relates to
+      FMEA's detection dimension.

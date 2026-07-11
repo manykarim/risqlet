@@ -1,0 +1,20 @@
+# Risk re-assessment for GitLab merge requests, powered by the risqlet CLI.
+# Include this in .gitlab-ci.yml or use it as a standalone job file.
+risqlet-risk-reassessment:
+  image: python:3.12
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    GIT_DEPTH: 0   # full history for the base ref
+  before_script:
+    - pip install uv
+    - uv tool install risqlet
+  script:
+    - risqlet validate
+    - risqlet check --base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" --json | tee risqlet-check.json
+    # ci_gate=block makes the tool exit non-zero and fail the job.
+    - risqlet check --base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+  artifacts:
+    when: always
+    paths:
+      - risqlet-check.json

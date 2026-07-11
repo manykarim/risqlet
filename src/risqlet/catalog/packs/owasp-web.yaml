@@ -1,0 +1,126 @@
+# Web application risk categories. The category NAMES follow OWASP's widely-known
+# taxonomy and are used as facts; all definitions and prompts are original text
+# (see CLEAN-ROOM.md). No OWASP text is reproduced. Opt-in: add "owasp-web" to
+# config.catalogs.
+id: owasp-web
+title: Web application risk categories (OWASP-informed)
+version: 1
+license: CC-BY-4.0
+attribution: >
+  Original text (c) risqlet contributors, CC BY 4.0. Category names follow the
+  OWASP web risk taxonomy as facts; no OWASP text is reproduced and this project
+  is not affiliated with or endorsed by the OWASP Foundation.
+notice: >
+  Category names follow the OWASP Top Ten web application risk taxonomy, used as
+  factual references. No OWASP text is reproduced; definitions and prompts are
+  original.
+entries:
+  - slug: broken-access-control
+    name: Broken access control
+    kind: heuristic
+    summary: Users reach data or actions their role should forbid — missing
+      ownership checks, guessable object references, privilege that widens by
+      tampering with a request.
+    prompts:
+      - For each resource, what stops user A from acting on user B's object by changing an id?
+      - Which authorization check lives only in the UI, not the server?
+    tags: [security, authorization, idor, access-control]
+    provenance: Category from the OWASP web risk taxonomy (fact); text original.
+  - slug: cryptographic-failures
+    name: Cryptographic failures
+    kind: heuristic
+    summary: Sensitive data is exposed because it was not protected in transit or
+      at rest, protected with weak or misused algorithms, or protected with keys
+      that are poorly managed.
+    prompts:
+      - Which sensitive field travels or rests unencrypted, including in logs and backups?
+      - Where are keys and secrets stored, and who can read them?
+    tags: [security, encryption, secrets, data-protection]
+    provenance: Category from the OWASP web risk taxonomy (fact); text original.
+  - slug: injection
+    name: Injection
+    kind: heuristic
+    summary: Untrusted input reaches an interpreter — SQL, shell, template, LDAP —
+      and changes the command's meaning because it was concatenated rather than
+      parameterized or escaped.
+    prompts:
+      - Which inputs reach a query, command, or template, and how are they neutralized?
+      - Is any interpreter fed string-concatenated user data anywhere?
+    tags: [security, injection, sqli, input-validation]
+    provenance: Category from the OWASP web risk taxonomy (fact); text original.
+  - slug: insecure-design
+    name: Insecure design
+    kind: heuristic
+    summary: The flaw is in the design, not the code — a missing security control,
+      an over-trusting workflow, or an abuse case nobody modeled, that no amount
+      of clean implementation fixes.
+    prompts:
+      - What abuse case was never considered for this feature's design?
+      - Which control is absent by design rather than merely buggy?
+    tags: [security, threat-modeling, abuse-cases, design]
+    provenance: Category from the OWASP web risk taxonomy (fact); text original.
+  - slug: security-misconfiguration
+    name: Security misconfiguration
+    kind: heuristic
+    summary: The software is safe but the deployment is not — default credentials,
+      verbose errors, open cloud buckets, unnecessary features enabled, missing
+      hardening.
+    prompts:
+      - What ships with a default or example credential still active?
+      - Which error message or debug feature leaks internals in production?
+    tags: [security, configuration, hardening, defaults]
+    provenance: Category from the OWASP web risk taxonomy (fact); text original.
+  - slug: vulnerable-and-outdated-components
+    name: Vulnerable and outdated components
+    kind: heuristic
+    summary: Risk arrives through dependencies — libraries, runtimes, images with
+      known vulnerabilities, unmaintained code, or versions nobody tracks.
+    prompts:
+      - Which dependency is unpatched, unmaintained, or of unknown provenance?
+      - How fast could we ship a fix if a critical CVE hit a core library today?
+    tags: [security, dependencies, supply-chain, patching]
+    provenance: Category from the OWASP web risk taxonomy (fact); text original.
+  - slug: identification-and-authentication-failures
+    name: Identification and authentication failures
+    kind: heuristic
+    summary: Identity can be faked or hijacked — weak credentials, broken session
+      handling, missing rate limits on login, tokens that never expire or bind to
+      nothing.
+    prompts:
+      - How would an attacker take over an account — credential stuffing, session fixation, weak reset?
+      - Do sessions and tokens expire, rotate, and bind to the right principal?
+    tags: [security, authentication, sessions, identity]
+    provenance: Category from the OWASP web risk taxonomy (fact); text original.
+  - slug: software-and-data-integrity-failures
+    name: Software and data integrity failures
+    kind: heuristic
+    summary: Code or data is trusted without verifying it was not tampered with —
+      unsigned updates, insecure deserialization, CI/CD pipelines that pull
+      unverified artifacts.
+    prompts:
+      - What code or data do we execute or trust without verifying its integrity?
+      - Could an attacker inject a malicious artifact into the build or update path?
+    tags: [security, integrity, deserialization, ci-cd]
+    provenance: Category from the OWASP web risk taxonomy (fact); text original.
+  - slug: security-logging-and-monitoring-failures
+    name: Security logging and monitoring failures
+    kind: heuristic
+    summary: Attacks succeed unseen because security-relevant events are not
+      logged, not alerted on, or not retained — the detection gap that turns an
+      incident into a breach.
+    prompts:
+      - Which security-relevant action produces no log or alert?
+      - If an attacker were active right now, how and when would we find out?
+    tags: [security, logging, monitoring, detection]
+    provenance: Category from the OWASP web risk taxonomy (fact); text original.
+  - slug: server-side-request-forgery
+    name: Server-side request forgery
+    kind: heuristic
+    summary: The server can be tricked into making requests on an attacker's
+      behalf — fetching internal URLs, cloud metadata, or other services it
+      should not reach — because it forwards a user-supplied destination.
+    prompts:
+      - Where does the server fetch a URL or address the user can influence?
+      - Could that fetch reach internal services or a cloud metadata endpoint?
+    tags: [security, ssrf, network, input-validation]
+    provenance: Category from the OWASP web risk taxonomy (fact); text original.

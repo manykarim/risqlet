@@ -1,0 +1,120 @@
+# Guideword catalog: word sets to cross-multiply against product elements for
+# systematic risk elicitation (element x guideword = "what if?"). All annotation
+# text is original (see CLEAN-ROOM.md); mnemonic names are credited facts.
+id: guidewords
+title: Guideword sets for systematic elicitation
+version: 1
+license: CC-BY-4.0
+attribution: >
+  Original text (c) risqlet contributors, CC BY 4.0. The HAZOP guideword method
+  originates in chemical-process safety practice (ICI, 1960s); STRIDE category
+  names originate at Microsoft; the structure/function/data/interfaces/platform/
+  operations/time decomposition is credited to James Bach's and Michael Bolton's
+  published test-strategy work. Names are used as facts; annotations are ours.
+entries:
+  - slug: flow-deviations
+    name: Flow deviations
+    kind: guideword-set
+    summary: Apply deviation words to every flow, message, or process step -
+      each word asks how the step could happen wrongly rather than whether it
+      happens at all.
+    prompts:
+      - For each step in this flow, apply every deviation word and note which combinations are plausible.
+      - Which deviation does the current design silently assume never happens?
+    tags: [hazop, flows, deviations, systematic]
+    provenance: Guideword method adapted from HAZOP practice (chemical industry,
+      1960s); word annotations original.
+    words: [none, more, less, reverse, early, late, out-of-order, intermittent,
+      duplicated, partial, other-than]
+  - slug: threat-categories
+    name: Security threat categories
+    kind: guideword-set
+    summary: Apply the six classic threat categories to every interface and
+      data flow - each word names a way an adversary abuses trust.
+    prompts:
+      - For each interface, which of the six categories has no current mitigation?
+      - Which data flow crosses a trust boundary without authentication or integrity protection?
+    tags: [stride, security, threats, systematic]
+    provenance: Category names from Microsoft's STRIDE model (Kohnfelder &
+      Garg); annotations original.
+    words: [spoofing, tampering, repudiation, information-disclosure,
+      denial-of-service, elevation-of-privilege]
+  - slug: product-dimensions
+    name: Product coverage dimensions
+    kind: guideword-set
+    summary: Sweep the product along seven dimensions to find territory the
+      test strategy never visits - what it is made of, what it does, what it
+      processes, where it connects, what it stands on, how it is run, and when
+      things happen.
+    prompts:
+      - Which of the seven dimensions has the least recent test attention?
+      - For each dimension, name the riskiest element inside it.
+    tags: [coverage, product-model, dimensions, systematic]
+    provenance: Dimension names follow the product-element decomposition in
+      James Bach's Heuristic Test Strategy Model (with Michael Bolton);
+      annotations original.
+    words: [structure, function, data, interfaces, platform, operations, time]
+  - slug: data-shapes
+    name: Data shape attacks
+    kind: guideword-set
+    summary: Apply hostile data shapes to every input - each word is a family
+      of inputs that historically breaks parsing, storage, or display.
+    prompts:
+      - Which input field has never met one of these shapes in a test?
+      - What does the export or report do with the worst of these shapes?
+    tags: [inputs, data, robustness, injection]
+    provenance: Common input-attack families from testing folklore and security
+      practice; annotations original.
+    words: [empty, whitespace-only, huge, deeply-nested, malformed, duplicate,
+      unicode-extremes, emoji, control-characters, boundary-dates,
+      negative-and-zero, precision-extremes, injection-strings, mixed-encoding]
+  - slug: environment-shifts
+    name: Environment shifts
+    kind: guideword-set
+    summary: Change the ground under the product - each word names an
+      environmental condition that production will eventually supply.
+    prompts:
+      - Which of these shifts has production already produced this year?
+      - Pick three shifts and describe the expected (not hoped-for) behavior.
+    tags: [environment, operations, robustness]
+    provenance: Common operational-failure families; annotations original.
+    words: [network-loss, network-flaky, disk-full, clock-skew, dns-failure,
+      certificate-expiry, locale-change, permission-loss, dependency-upgrade,
+      resource-pressure]
+  - slug: lifecycle-moments
+    name: Lifecycle moments
+    kind: guideword-set
+    summary: Walk the product through its life stages - risk concentrates at
+      the transitions everyone tests least.
+    prompts:
+      - Which lifecycle moment was last exercised in an environment resembling production?
+      - What happens to data and configuration at each transition?
+    tags: [lifecycle, installation, migration, operations]
+    provenance: Common deployment-lifecycle stages; annotations original.
+    words: [install, first-run, configure, upgrade, downgrade, migrate, scale-up,
+      scale-down, backup, restore, rollback, decommission]
+  - slug: user-extremes
+    name: User extremes
+    kind: guideword-set
+    summary: Replace the imagined average user with extremes - each word is a
+      user whose needs or behavior stress a different assumption.
+    prompts:
+      - Which extreme user would fail hardest in the current flow?
+      - Which extreme is actually common in our real user base?
+    tags: [users, personas, inclusion, abuse]
+    provenance: Persona-extremes elicitation is common practice; annotations
+      original.
+    words: [novice, expert, power-user, impaired, distracted, offline, mobile-only,
+      hostile, automated-script, bulk-importer, auditor]
+  - slug: scale-shifts
+    name: Scale shifts
+    kind: guideword-set
+    summary: Move every quantity an order of magnitude - each word names a
+      scale regime with its own failure modes.
+    prompts:
+      - Which scale regime has the product never actually experienced?
+      - What is the first thing that breaks in each regime - and is that known or guessed?
+    tags: [scale, load, growth, capacity]
+    provenance: Common capacity-planning framings; annotations original.
+    words: [zero-load, single-user, tenfold, hundredfold, burst, sustained-peak,
+      gradual-growth, thundering-herd, backlog-drain]

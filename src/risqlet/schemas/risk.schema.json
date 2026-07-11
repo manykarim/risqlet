@@ -1,0 +1,259 @@
+{
+  "$defs": {
+    "Barrier": {
+      "enum": [
+        "prevent",
+        "detect",
+        "recover"
+      ],
+      "title": "Barrier",
+      "type": "string"
+    },
+    "ElicitedBy": {
+      "additionalProperties": true,
+      "properties": {
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "method": {
+          "$ref": "#/$defs/Method"
+        },
+        "prompt_ref": {
+          "default": "",
+          "title": "Prompt Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "ElicitedBy",
+      "type": "object"
+    },
+    "Lever": {
+      "enum": [
+        "severity",
+        "occurrence",
+        "detection"
+      ],
+      "title": "Lever",
+      "type": "string"
+    },
+    "Method": {
+      "enum": [
+        "riskstorming",
+        "hazop",
+        "stride",
+        "premortem",
+        "fmea",
+        "inside-out",
+        "manual"
+      ],
+      "title": "Method",
+      "type": "string"
+    },
+    "Mitigation": {
+      "additionalProperties": true,
+      "properties": {
+        "barrier": {
+          "$ref": "#/$defs/Barrier"
+        },
+        "concrete": {
+          "minLength": 1,
+          "title": "Concrete",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^M-\\d{4}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "lever": {
+          "$ref": "#/$defs/Lever"
+        },
+        "residual_note": {
+          "minLength": 1,
+          "title": "Residual Note",
+          "type": "string"
+        },
+        "risk_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Risk Ids",
+          "type": "array"
+        },
+        "technique_ref": {
+          "default": "",
+          "title": "Technique Ref",
+          "type": "string"
+        },
+        "tests": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tests",
+          "type": "array"
+        },
+        "treatment": {
+          "$ref": "#/$defs/Treatment"
+        }
+      },
+      "required": [
+        "id",
+        "risk_ids",
+        "treatment",
+        "lever",
+        "barrier",
+        "concrete",
+        "residual_note"
+      ],
+      "title": "Mitigation",
+      "type": "object"
+    },
+    "ScoreSet": {
+      "additionalProperties": true,
+      "properties": {
+        "derived": {
+          "additionalProperties": true,
+          "title": "Derived",
+          "type": "object"
+        },
+        "policy": {
+          "minLength": 1,
+          "title": "Policy",
+          "type": "string"
+        },
+        "rubric_anchors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rubric Anchors",
+          "type": "array"
+        },
+        "scored_by": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scored By",
+          "type": "array"
+        },
+        "values": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "policy",
+        "values"
+      ],
+      "title": "ScoreSet",
+      "type": "object"
+    },
+    "Status": {
+      "enum": [
+        "proposed",
+        "reviewed",
+        "accepted",
+        "mitigating",
+        "closed",
+        "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "Treatment": {
+      "enum": [
+        "avoid",
+        "reduce",
+        "transfer",
+        "accept"
+      ],
+      "title": "Treatment",
+      "type": "string"
+    }
+  },
+  "$id": "https://risqlet.dev/schemas/v1/risk.schema.json",
+  "additionalProperties": true,
+  "properties": {
+    "aspects": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Aspects",
+      "type": "array"
+    },
+    "disagreement": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disagreement"
+    },
+    "elicited_by": {
+      "$ref": "#/$defs/ElicitedBy"
+    },
+    "id": {
+      "pattern": "^R-\\d{4}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "merged_from": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Merged From",
+      "type": "array"
+    },
+    "mitigations": {
+      "items": {
+        "$ref": "#/$defs/Mitigation"
+      },
+      "title": "Mitigations",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "scores": {
+      "items": {
+        "$ref": "#/$defs/ScoreSet"
+      },
+      "title": "Scores",
+      "type": "array"
+    },
+    "statement": {
+      "minLength": 1,
+      "title": "Statement",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/Status",
+      "default": "proposed"
+    }
+  },
+  "required": [
+    "id",
+    "statement",
+    "elicited_by"
+  ],
+  "title": "Risk",
+  "type": "object"
+}

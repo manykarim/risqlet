@@ -1,0 +1,19 @@
+id: lint-format-posttool
+title: Auto lint/format changed files (blocking on lint error)
+surface: claude-hook
+enforcement: hard
+barriers: [detect]
+selectors:
+  aspects: [iso25010.maintainability]
+  tags: [quality, style]
+params: []
+body: |
+  PostToolUse hook (matcher Write|Edit) — run the project formatter/linter on the
+  changed file and block on an unfixable error (adapt the command to your stack):
+  {
+    "matcher": "Write|Edit",
+    "hooks": [{
+      "type": "command",
+      "command": "f=\"$CLAUDE_TOOL_FILE_PATH\"; case \"$f\" in *.py) ruff check --fix \"$f\" || exit 2 ;; esac; exit 0"
+    }]
+  }

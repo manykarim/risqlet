@@ -1,0 +1,74 @@
+# Adversary-tactic elicitation pack. The ATT&CK Enterprise tactic NAMES are used
+# as factual references to structure a security-coverage sweep. All descriptive
+# text is original (see CLEAN-ROOM.md). No ATT&CK technique text or technique
+# identifiers are reproduced. Opt-in: add "mitre-attack" to config.catalogs.
+id: mitre-attack
+title: Adversary tactics (ATT&CK-informed)
+version: 1
+license: MITRE ATT&CK terms (royalty-free, attribution required)
+attribution: >
+  Original text (c) risqlet contributors. Tactic names are factual references to
+  the MITRE ATT&CK Enterprise tactics; no ATT&CK descriptive text or technique
+  identifiers are reproduced.
+notice: >
+  ATT&CK(R) and MITRE ATT&CK(R) are registered trademarks of The MITRE
+  Corporation. (C) 2015-2026 The MITRE Corporation. This material references the
+  names of MITRE ATT&CK Enterprise tactics as facts and is distributed with
+  attribution; no ATT&CK technique descriptions or identifiers are reproduced,
+  and this project is not affiliated with or endorsed by The MITRE Corporation.
+entries:
+  - slug: enterprise-tactics
+    name: Adversary tactic sweep
+    kind: guideword-set
+    summary: Walk a system against each adversary goal in turn — for every
+      tactic, ask what an attacker with that objective would attempt here, so no
+      stage of an intrusion is left unconsidered.
+    prompts:
+      - For each tactic word, what is the easiest move an attacker could make against this system?
+      - Which tactic has no detection or control in place today?
+    tags: [security, adversary, coverage, systematic]
+    provenance: Tactic names from the MITRE ATT&CK Enterprise matrix (facts);
+      annotations original.
+    words: [reconnaissance, resource-development, initial-access, execution,
+      persistence, privilege-escalation, defense-evasion, credential-access,
+      discovery, lateral-movement, collection, command-and-control, exfiltration,
+      impact]
+  - slug: initial-access-review
+    name: Initial-access review
+    kind: technique
+    summary: Enumerate every way an outside actor first reaches the system —
+      exposed endpoints, supplied inputs, trusted integrations, third-party
+      components — and judge which are actually reachable and controllable.
+    prompts:
+      - What are all the entry points an unauthenticated actor can touch?
+      - Which trusted upstream, if compromised, becomes our initial-access path?
+    tags: [security, attack-surface, entry-points]
+    provenance: Frames the ATT&CK "Initial Access" tactic as an elicitation lens;
+      text original.
+    related: [mitre-attack.enterprise-tactics]
+  - slug: privilege-and-lateral
+    name: Privilege and lateral movement
+    kind: technique
+    summary: Assume a foothold and ask how far it spreads — what an attacker can
+      escalate to, what trust boundaries they can cross, and what a single
+      compromised component grants access to.
+    prompts:
+      - From a low-privilege foothold, what is the shortest path to admin or to data?
+      - Which trust boundary is enforced only by convention, not by a control?
+    tags: [security, privilege-escalation, lateral-movement, blast-radius]
+    provenance: Frames the ATT&CK escalation/lateral-movement tactics as a lens;
+      text original.
+    related: [mitre-attack.enterprise-tactics]
+  - slug: exfiltration-and-impact
+    name: Exfiltration and impact paths
+    kind: technique
+    summary: Follow the crown jewels outward — how data could leave, and what an
+      attacker could destroy, encrypt, or corrupt — to size the worst realistic
+      outcome and where to place detection.
+    prompts:
+      - What is the highest-value data, and every channel it could leave by?
+      - What could an attacker irreversibly break, and would we detect it in time?
+    tags: [security, exfiltration, impact, detection]
+    provenance: Frames the ATT&CK exfiltration/impact tactics as a lens;
+      text original.
+    related: [mitre-attack.enterprise-tactics]

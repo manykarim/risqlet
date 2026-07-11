@@ -1,0 +1,32 @@
+# Scoring policy: Severity x Occurrence x Detection with Action-Priority lookup.
+#
+# RPN is computed as a *sorting heuristic only* — deliberately no thresholds on
+# the raw product (ordinal multiplication is not a measurement). Prioritization
+# comes from the severity-dominant band table below, evaluated top-down, first
+# match wins. The table is an original work in the spirit of AIAG-VDA-style
+# Action Priority; it is not a reproduction of any published table.
+id: sod-ap-v1
+description: FMEA-style S/O/D scoring with Action-Priority bands (severity-dominant)
+factors:
+  severity: {min: 1, max: 10}    # impact if the risk materializes
+  occurrence: {min: 1, max: 10}  # likelihood of the cause occurring
+  detection: {min: 1, max: 10}   # HIGH = poor detectability (weak checks)
+derived:
+  rpn:
+    formula: product
+  action_priority:
+    type: lookup
+    bands:
+      - {when: {severity: ">=9"}, value: HIGH}   # severe: always high, regardless
+      - {when: {severity: "7-8", occurrence: ">=4"}, value: HIGH}
+      - {when: {severity: "7-8", occurrence: "2-3", detection: ">=5"}, value: MEDIUM}
+      - {when: {severity: "7-8", occurrence: "1", detection: ">=8"}, value: MEDIUM}
+      - {when: {severity: "4-6", occurrence: ">=7"}, value: HIGH}
+      - {when: {severity: "4-6", occurrence: "4-6", detection: ">=5"}, value: MEDIUM}
+      - {when: {severity: "4-6", occurrence: "2-3", detection: ">=7"}, value: MEDIUM}
+      - {when: {severity: "2-3", occurrence: ">=7", detection: ">=5"}, value: MEDIUM}
+      - {default: LOW}
+ranking:
+  field: action_priority
+  order: [HIGH, MEDIUM, LOW]
+  tiebreaker: rpn   # higher first within a band

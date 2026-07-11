@@ -1,0 +1,12 @@
+id: agents-change-scope
+title: Re-check risks when touching tracked paths (advisory)
+surface: agents-md
+enforcement: soft
+barriers: [detect]
+selectors:
+  match_any: true
+params: [paths]
+body: |
+  When you change files under {{paths}}, these areas carry tracked risks: run
+  `risqlet diff --base <merge-base>` to see which register risks the change
+  touches, and re-score or add mitigations before finishing.

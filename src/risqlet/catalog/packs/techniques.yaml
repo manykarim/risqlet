@@ -1,0 +1,295 @@
+# Test-technique catalog. All entries express long-established, uncopyrightable
+# testing techniques; text is original (see CLEAN-ROOM.md).
+id: techniques
+title: Test techniques
+version: 1
+license: CC-BY-4.0
+attribution: >
+  Original text (c) risqlet contributors, CC BY 4.0. Techniques are established
+  professional practice; originators credited per entry where identifiable.
+entries:
+  - slug: boundary-value
+    name: Boundary-value analysis
+    kind: technique
+    summary: Test exactly at, just below, and just above every limit — sizes,
+      dates, quantities, permissions — because defects cluster where behavior
+      is supposed to change.
+    prompts:
+      - For each numeric or date limit, what happens at limit-1, limit, and limit+1?
+      - Which limits exist in code but not in any specification?
+    tags: [functional, input, limits, edge-cases]
+    provenance: Classic test-design technique (Myers-era); no single originator.
+    related: [heuristics.boundary-hunting]
+  - slug: equivalence-partitioning
+    name: Equivalence partitioning
+    kind: technique
+    summary: Split inputs into classes the product should treat identically and
+      test one representative per class — coverage by argument instead of by volume.
+    prompts:
+      - Which input classes does the implementation actually branch on?
+      - Is there a class everyone assumes is equivalent that has never been checked?
+    tags: [functional, input, coverage, test-design]
+    provenance: Classic test-design technique; no single originator.
+  - slug: state-transition
+    name: State-transition testing
+    kind: technique
+    summary: Model the product as states and transitions, then exercise legal
+      paths, illegal jumps, and re-entrant loops — especially transitions the UI
+      supposedly prevents.
+    prompts:
+      - Which state can be reached twice by different routes, and does it behave the same?
+      - What happens when a transition fires in a state that should forbid it?
+    tags: [functional, state, workflow, modeling]
+    provenance: Classic model-based technique; no single originator.
+    related: [heuristics.sequence-shuffling]
+  - slug: decision-tables
+    name: Decision-table testing
+    kind: technique
+    summary: Enumerate rule combinations (conditions x actions) in a table so
+      contradictory, missing, and never-triggered rules become visible before
+      they ship.
+    prompts:
+      - Which combination of conditions has no defined outcome?
+      - Do any two rules overlap with different actions?
+    tags: [functional, rules, combinations, business-logic]
+    provenance: Classic specification-based technique; no single originator.
+  - slug: crud-sweep
+    name: CRUD sweep
+    kind: technique
+    summary: For every entity, exercise create, read, update, and delete —
+      plus the forgotten paths - bulk operations, concurrent edits, and deleting
+      things other records still point to.
+    prompts:
+      - What happens to dependents when a parent record is deleted?
+      - Can two users update the same record simultaneously, and who wins?
+    tags: [data, entities, lifecycle]
+    provenance: Common data-testing practice; popularized in test-heuristic
+      collections.
+    related: [iso25010.data-integrity]
+  - slug: exploratory-tours
+    name: Exploratory tours
+    kind: technique
+    summary: Structured exploration under a theme — follow the money, act
+      malicious, use only shortcuts, visit every setting — so unscripted testing
+      still has direction and a story to report.
+    prompts:
+      - Which tour theme targets this risk best - money, data, error paths, or configuration?
+      - What did the last exploratory session find that scripted tests missed?
+    tags: [exploratory, session-based, discovery]
+    provenance: Tour metaphor popularized by James Whittaker; text original.
+  - slug: stress-testing
+    name: Stress testing
+    kind: technique
+    summary: Push past expected load until something degrades or breaks, to learn
+      what fails first, how loudly, and whether the system recovers unaided.
+    prompts:
+      - What is the first component to fall over when traffic doubles?
+      - After overload ends, does service recover automatically or need a human?
+    tags: [performance, load, breaking-point, capacity]
+    provenance: Established performance-testing practice; no single originator.
+    related: [iso25010.performance-efficiency, techniques.load-testing]
+  - slug: load-testing
+    name: Load testing
+    kind: technique
+    summary: Drive realistic concurrent workload at expected and peak volumes
+      and measure response times and error rates against explicit targets.
+    prompts:
+      - What does the real production traffic mix look like, and does the test reproduce it?
+      - Which latency percentile matters to users - median, p95, or p99?
+    tags: [performance, concurrency, benchmarks]
+    provenance: Established performance-testing practice; no single originator.
+  - slug: soak-testing
+    name: Soak testing
+    kind: technique
+    summary: Run sustained realistic load for hours or days to expose leaks,
+      drift, and slow degradation that short tests structurally cannot see.
+    prompts:
+      - What grows over a 48-hour run - memory, handles, queue depth, disk?
+      - Do scheduled jobs (backups, rotations) interact badly with steady load?
+    tags: [performance, endurance, leaks, degradation]
+    provenance: Established performance-testing practice; no single originator.
+  - slug: chaos-experiments
+    name: Chaos experiments
+    kind: technique
+    summary: Deliberately inject failures (kill instances, add latency, drop
+      packets) in a controlled way to verify the system's resilience claims
+      against reality.
+    prompts:
+      - Which resilience mechanism has never actually fired in anger?
+      - What is the smallest failure injection that would test this claim safely?
+    tags: [reliability, resilience, failure-injection, production]
+    provenance: Chaos engineering practice popularized by Netflix; text original.
+    related: [iso25010.fault-tolerance]
+  - slug: fuzzing
+    name: Fuzzing
+    kind: technique
+    summary: Feed generated malformed, random, or mutated inputs at parsers and
+      interfaces automatically, watching for crashes, hangs, and memory errors.
+    prompts:
+      - Which input surface parses untrusted data and has never been fuzzed?
+      - What would a crash here cost - denial of service or code execution?
+    tags: [security, robustness, inputs, automation]
+    provenance: Fuzz testing originates with Barton Miller's work (1988); text original.
+  - slug: property-based
+    name: Property-based testing
+    kind: technique
+    summary: State invariants ("output is always sorted", "encode then decode is
+      identity") and let a generator hunt for counterexamples, shrinking failures
+      to minimal cases.
+    prompts:
+      - What property must hold for every input, not just the examples we thought of?
+      - Which pair of functions should be inverses of each other?
+    tags: [automation, invariants, generative]
+    provenance: Popularized by QuickCheck (Claessen & Hughes, 2000); text original.
+  - slug: mutation-testing
+    name: Mutation testing
+    kind: technique
+    summary: Seed small artificial defects into the code and check the test suite
+      catches them — measuring whether green tests actually verify anything.
+    prompts:
+      - Which module has high coverage but suspiciously never fails?
+      - If this condition were inverted, would any test notice?
+    tags: [test-quality, coverage, meta]
+    provenance: Mutation analysis dates to DeMillo/Lipton/Sayward (1978); text original.
+    related: [heuristics.test-the-testing]
+  - slug: security-probing
+    name: Security probing
+    kind: technique
+    summary: Actively attempt misuse — injection payloads, privilege escalation,
+      broken object references, session replay — guided by a recognized
+      vulnerability catalog for the technology at hand.
+    prompts:
+      - What happens when IDs in URLs and payloads are swapped for someone else's?
+      - Which input reaches an interpreter (SQL, shell, template) and how is it neutralized?
+    tags: [security, penetration, vulnerabilities, owasp]
+    provenance: Security-testing practice; community catalogs (e.g. OWASP) referenced
+      as external resources, not reproduced.
+    related: [iso25010.security, guidewords.threat-categories]
+  - slug: dependency-audit
+    name: Dependency audit
+    kind: technique
+    summary: Inventory third-party components, check them for known
+      vulnerabilities and hostile updates, and verify licenses and pinning —
+      the supply chain is part of the product.
+    prompts:
+      - Which dependency is unmaintained, unpinned, or one person's hobby?
+      - How fast could we ship if a critical CVE landed in a core library today?
+    tags: [security, supply-chain, licenses, sca]
+    provenance: Established security practice (software composition analysis);
+      text original.
+  - slug: accessibility-audit
+    name: Accessibility audit
+    kind: technique
+    summary: Evaluate flows against accessibility criteria with automated
+      scanners plus manual assistive-technology passes — keyboard-only, screen
+      reader, zoom, contrast.
+    prompts:
+      - Which critical flow fails with keyboard-only navigation?
+      - Do error messages get announced by screen readers or only flash visually?
+    tags: [accessibility, a11y, wcag, audit]
+    provenance: Established practice; WCAG referenced as external criteria, not
+      reproduced.
+    related: [iso25010.accessibility]
+  - slug: usability-walkthrough
+    name: Usability walkthrough
+    kind: technique
+    summary: Watch representative users attempt real tasks without coaching,
+      recording where they hesitate, err, or give up — evidence beats opinion
+      in UI arguments.
+    prompts:
+      - Can a new user complete the core task with no help in one sitting?
+      - Where do users pause longest, and what are they looking for there?
+    tags: [usability, ux, user-research]
+    provenance: Established UX practice; no single originator.
+  - slug: contract-testing
+    name: Contract testing
+    kind: technique
+    summary: Pin the promises between services as executable contracts so a
+      provider change that would break a consumer fails in CI, not in production.
+    prompts:
+      - Which consumer assumptions about this API are documented nowhere?
+      - Does anything verify backward compatibility before a provider deploys?
+    tags: [integration, api, microservices, compatibility]
+    provenance: Consumer-driven contracts pattern (Robinson, 2006; Pact ecosystem);
+      text original.
+    related: [iso25010.compatibility]
+  - slug: integration-paths
+    name: Integration-path testing
+    kind: technique
+    summary: Exercise the seams — real calls across component boundaries,
+      including timeout, retry, duplicate-delivery, and partial-failure behavior
+      that unit tests mock away.
+    prompts:
+      - Which integration is only ever tested against a mock?
+      - What does the caller do when this dependency times out versus errors?
+    tags: [integration, seams, timeouts, retries]
+    provenance: Established integration-testing practice; no single originator.
+  - slug: recovery-failover
+    name: Recovery and failover testing
+    kind: technique
+    summary: Rehearse the bad day - kill the primary, restore the backup, replay
+      the queue - and measure recovery time and data loss against the promises
+      made to the business.
+    prompts:
+      - Has failover ever been triggered on purpose in an environment that matters?
+      - How much data is lost between the last backup and a crash right now?
+    tags: [reliability, disaster-recovery, backup, failover]
+    provenance: Established operations practice; no single originator.
+    related: [iso25010.recoverability]
+  - slug: compatibility-matrix
+    name: Compatibility-matrix testing
+    kind: technique
+    summary: Define the supported grid of browsers, devices, OS versions, and
+      integrations, then test the risky cells deliberately instead of whatever
+      the team happens to own.
+    prompts:
+      - Which cell of the support matrix has the most users and the least testing?
+      - What is officially unsupported, and does the product say so or just misbehave?
+    tags: [compatibility, platforms, browsers, devices]
+    provenance: Established practice; no single originator.
+  - slug: data-reconciliation
+    name: Data reconciliation checks
+    kind: technique
+    summary: Periodically compare datasets that must agree — internal ledger vs.
+      provider settlement, cache vs. source, replica vs. primary — and alert on
+      divergence with enough context to act.
+    prompts:
+      - Which money- or compliance-relevant totals are never cross-checked between systems?
+      - When the reconciliation finds a mismatch, who is paged and what can they do?
+    tags: [data, consistency, finance, batch]
+    provenance: Established data-quality/finance practice; no single originator.
+    related: [iso25010.data-integrity]
+  - slug: monitoring-checks
+    name: Monitoring and synthetic checks
+    kind: technique
+    summary: Encode expectations as production probes — synthetic transactions,
+      SLO alerts, anomaly detection — so tests keep running after deployment,
+      where the users are.
+    prompts:
+      - Which user-visible failure would no current alert catch?
+      - Does a synthetic transaction exercise the full critical path, including third parties?
+    tags: [observability, production, alerts, slo]
+    provenance: Established SRE practice; no single originator.
+    related: [iso25010.observability]
+  - slug: regression-selection
+    name: Risk-based regression selection
+    kind: technique
+    summary: Choose what to re-test from change impact and risk priority rather
+      than running everything or trusting habit — and record the rationale so the
+      gaps are chosen, not accidental.
+    prompts:
+      - Which register risks does this change touch, and which tests cover them?
+      - What is deliberately not re-tested this release, and who accepted that?
+    tags: [regression, prioritization, risk-based, ci]
+    provenance: Core practice of risk-based testing (ISTQB-described); text original.
+  - slug: api-negative-testing
+    name: API negative testing
+    kind: technique
+    summary: Call APIs the wrong way on purpose — missing fields, wrong types,
+      stale tokens, oversized payloads, out-of-order calls — and require precise,
+      safe error behavior.
+    prompts:
+      - Does any malformed request produce a 500, a stack trace, or a partial write?
+      - What happens when step two of a flow is called before step one?
+    tags: [api, robustness, errors, contracts]
+    provenance: Established API-testing practice; no single originator.

@@ -1,0 +1,50 @@
+# Risk re-assessment on pull requests, powered by the risqlet CLI.
+# Validates the register and checks whether the PR touches tracked risks with
+# failing or missing coverage. Uses only first-party actions.
+name: risqlet
+
+on:
+  pull_request:
+    # Narrow with paths: to mirror risqlet's ci_paths filter and cut noise.
+    # paths: ["src/**", "app/**"]
+
+jobs:
+  risk-reassessment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so the base ref is available
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install risqlet
+        run: uv tool install risqlet
+
+      - name: Validate the risk register
+        run: risqlet validate
+
+      - name: Re-assess risks touched by this PR
+        id: check
+        run: |
+          risqlet check --base "origin/${{ github.base_ref }}" --json > risqlet-check.json || true
+          {
+            echo '## risk re-assessment via risqlet'
+            echo ''
+            python - <<'PY'
+          import json
+          d = json.load(open("risqlet-check.json"))
+          flags = d.get("flagged", [])
+          if not flags:
+              print("No tracked risks flagged by this change. ✅")
+          else:
+              print(f"Mode: `{d['mode']}` — {len(flags)} flagged:")
+              print()
+              for f in flags:
+                  print(f"- **{f['risk']}** ({f['status']}, {f['priority']}): {f['flag']}")
+                  print(f"  - action: {f['suggested_action']}")
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Gate honors risqlet's ci_gate mode (block => non-zero via the tool).
+          risqlet check --base "origin/${{ github.base_ref }}"

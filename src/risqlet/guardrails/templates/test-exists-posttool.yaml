@@ -1,0 +1,19 @@
+id: test-exists-posttool
+title: Warn when source changes without a test (advisory)
+surface: claude-hook
+enforcement: soft
+barriers: [detect]
+selectors:
+  aspects: [iso25010.testability]
+  tags: [coverage, tests]
+params: [paths]
+body: |
+  PostToolUse hook (matcher Write|Edit) — advisory nudge when a source file under
+  {{paths}} is changed but no matching test file was touched this session:
+  {
+    "matcher": "Write|Edit",
+    "hooks": [{
+      "type": "command",
+      "command": "f=\"$CLAUDE_TOOL_FILE_PATH\"; case \"$f\" in {{paths_case}}) case \"$f\" in *test*|*spec*) ;; *) echo 'risqlet: changed source under a tracked-risk path — does it need a test?' ;; esac ;; esac; exit 0"
+    }]
+  }

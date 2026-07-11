@@ -1,0 +1,13 @@
+id: injection-review-agents
+title: Neutralize untrusted input at interpreters (advisory)
+surface: agents-md
+enforcement: soft
+barriers: [prevent]
+selectors:
+  catalog_refs: [owasp-web.injection, owasp-web.server-side-request-forgery]
+  tags: [injection]
+params: []
+body: |
+  Any value derived from user input that reaches a SQL query, shell command,
+  template, or outbound URL must be parameterized, escaped, or allow-listed —
+  never string-concatenated. Treat request-supplied destinations as hostile.

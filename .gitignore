@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# internal reference material (never publish)
+reference/
+
+# dogfooding experiment transcripts — kept local, excluded from publish (other projects' findings)
+docs/experiments/

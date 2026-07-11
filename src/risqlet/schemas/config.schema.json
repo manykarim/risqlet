@@ -1,0 +1,107 @@
+{
+  "$defs": {
+    "Constraints": {
+      "additionalProperties": true,
+      "properties": {
+        "max_aspects": {
+          "default": 6,
+          "minimum": 1,
+          "title": "Max Aspects",
+          "type": "integer"
+        },
+        "max_top_risks": {
+          "default": 10,
+          "minimum": 1,
+          "title": "Max Top Risks",
+          "type": "integer"
+        }
+      },
+      "title": "Constraints",
+      "type": "object"
+    },
+    "Phase": {
+      "enum": [
+        "context",
+        "aspects",
+        "elicit",
+        "score",
+        "mitigate",
+        "emit"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "SelectedAspect": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9._-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "rank": {
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "rank",
+        "rationale"
+      ],
+      "title": "SelectedAspect",
+      "type": "object"
+    }
+  },
+  "$id": "https://risqlet.dev/schemas/v1/config.schema.json",
+  "additionalProperties": true,
+  "properties": {
+    "aspects": {
+      "items": {
+        "$ref": "#/$defs/SelectedAspect"
+      },
+      "title": "Aspects",
+      "type": "array"
+    },
+    "catalogs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Catalogs",
+      "type": "array"
+    },
+    "constraints": {
+      "$ref": "#/$defs/Constraints"
+    },
+    "phase": {
+      "$ref": "#/$defs/Phase",
+      "default": "context"
+    },
+    "project": {
+      "minLength": 1,
+      "title": "Project",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "scoring_policy": {
+      "default": "sod-ap-v1",
+      "title": "Scoring Policy",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project"
+  ],
+  "title": "Config",
+  "type": "object"
+}
