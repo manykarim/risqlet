@@ -1,0 +1,8 @@
+id: codex
+name: Codex CLI
+detect: {binary: codex, dirs: ["~/.codex"]}
+components:
+  instructions: {scopes: [project, global], project: "AGENTS.md", global: "~/.codex/AGENTS.md", method: md-section}
+  mcp:          {scopes: [global], global: "~/.codex/config.toml", method: toml-merge, key: mcp_servers, note: "Codex registers MCP globally; run with --scope global"}
+  skills:       {scopes: [global], global: "~/.codex/skills", method: copy-skills}
+  commands:     {scopes: [global], global: "~/.codex/prompts", method: copy-commands}

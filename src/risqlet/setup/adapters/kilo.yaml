@@ -1,0 +1,6 @@
+id: kilo
+name: Kilo
+detect: {binary: kilo, dirs: ["~/.config/kilo", "~/.kilo"]}
+components:
+  instructions: {scopes: [project, global], project: "AGENTS.md", global: "~/.config/kilo/AGENTS.md", method: md-section}
+  mcp:          {scopes: [project, global], project: "kilo.jsonc", global: "~/.config/kilo/kilo.jsonc", method: jsonc-merge, key: mcp}

@@ -444,6 +444,124 @@ def cmd_guardrails_install(args) -> int:
     return 0
 
 
+def _setup_print_plan(plan) -> None:
+    for agent, actions in sorted(plan.by_agent().items()):
+        comps = ", ".join(f"{a.component}" for a in actions)
+        print(f"  {agent}: {comps}")
+        for a in actions:
+            print(f"      {a.component} -> {a.target}")
+    for sk in plan.skipped:
+        print(f"  skip {sk.agent}/{sk.component}: {sk.reason}")
+
+
+def cmd_setup(args) -> int:
+    import sys as _sys
+
+    from risqlet.setup import (
+        SetupError,
+        apply_plan,
+        build_plan,
+        detect,
+        load_adapters,
+        remove,
+        status,
+    )
+    from risqlet.setup import interactive as _tui
+
+    project_root = (args.dir or Path.cwd())
+    adapters = load_adapters()
+
+    if args.status:
+        report = status(args.scope, project_root)
+        print(json.dumps(report, indent=2) if args.json else _format_status(report))
+        return 0
+    if args.remove:
+        agents = args.agents.split(",") if args.agents else None
+        result = remove(args.scope, project_root, agents)
+        print(json.dumps(result, indent=2) if args.json
+              else f"removed {result['removed']} entrie(s); {result['remaining']} remain")
+        return 0
+
+    detected = detect(adapters)
+    interactive = (not args.agents and not args.all_detected
+                   and not args.update and _sys.stdin.isatty())
+
+    if interactive:
+        opts = [(aid, f"{adapters[aid].name}"
+                 + ("  (detected)" if aid in detected else "")) for aid in adapters]
+        agent_ids = _tui.multiselect("Configure which agents?", opts, set(detected))
+        if not agent_ids:
+            print("nothing selected")
+            return 0
+        scope = _tui.choose("Scope?", ["project", "global"], args.scope)
+        components = None
+    else:
+        if args.all_detected:
+            agent_ids = detected
+        elif args.agents:
+            agent_ids = args.agents.split(",")
+        elif args.update:
+            agent_ids = sorted({e.agent for e in
+                                __import__("risqlet.setup", fromlist=["read_manifest"])
+                                .read_manifest(args.scope, project_root).entries})
+        else:
+            print("error: specify --agents, --all-detected, or run in a TTY for "
+                  "interactive setup", file=_sys.stderr)
+            return 1
+        scope = args.scope
+        components = args.components.split(",") if args.components else None
+
+    if not agent_ids:
+        print("no agents to configure" + (" (none detected)" if args.all_detected else ""))
+        return 0
+    try:
+        plan = build_plan(adapters, agent_ids, scope, components, project_root)
+    except SetupError as exc:
+        print(f"error: {exc}", file=_sys.stderr)
+        return 1
+
+    if args.dry_run:
+        if args.json:
+            print(json.dumps({"scope": plan.scope,
+                              "actions": [a.model_dump() for a in plan.actions],
+                              "skipped": [s.model_dump() for s in plan.skipped]}, indent=2))
+        else:
+            print(f"plan ({plan.scope} scope) — dry run, nothing written:")
+            _setup_print_plan(plan)
+        return 0
+
+    if interactive:
+        print(f"\nplan ({scope} scope):")
+        _setup_print_plan(plan)
+        if not _tui.confirm("apply?"):
+            print("aborted")
+            return 0
+    elif not args.yes:
+        print("error: refusing to write without --yes (non-interactive); plan:",
+              file=_sys.stderr)
+        _setup_print_plan(plan)
+        return 1
+
+    result = apply_plan(plan, project_root, force=args.force)
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(f"configured {', '.join(result['agents'])} ({result['scope']} scope): "
+              f"{result['installed']} item(s)")
+        for sk in result["skipped"]:
+            print(f"  skip {sk['agent']}/{sk['component']}: {sk['reason']}")
+    return 0
+
+
+def _format_status(report: dict) -> str:
+    lines = [f"scope: {report['scope']}  (risqlet {report['risqlet_version'] or '?'})"]
+    if not report["agents"]:
+        lines.append("  nothing installed")
+    for agent, items in sorted(report["agents"].items()):
+        lines.append(f"  {agent}: " + ", ".join(i["component"] for i in items))
+    return "\n".join(lines)
+
+
 def cmd_mcp(args) -> int:
     from risqlet.mcp.server import main as mcp_main
 
@@ -616,6 +734,27 @@ def build_parser() -> argparse.ArgumentParser:
     p_merge.add_argument("duplicates", nargs="+", metavar="R-NNNN")
     _add_common(p_merge)
     p_merge.set_defaults(func=cmd_merge)
+
+    p_setup = sub.add_parser(
+        "setup", help="configure coding agents to use risqlet (skills, MCP, "
+                      "instructions, hooks) — install/remove/update, project or global"
+    )
+    p_setup.add_argument("--agents", default=None,
+                         help="comma-separated agent ids (claude,cursor,opencode,codex,"
+                              "copilot,kilo,pi)")
+    p_setup.add_argument("--all-detected", action="store_true",
+                         help="configure every detected agent")
+    p_setup.add_argument("--scope", choices=["project", "global"], default="project")
+    p_setup.add_argument("--components", default=None,
+                         help="comma-separated: skills,mcp,instructions,hooks,commands")
+    p_setup.add_argument("--dry-run", action="store_true", help="print the plan, write nothing")
+    p_setup.add_argument("--yes", action="store_true", help="apply without confirmation")
+    p_setup.add_argument("--force", action="store_true")
+    p_setup.add_argument("--remove", action="store_true", help="uninstall (reverse the manifest)")
+    p_setup.add_argument("--update", action="store_true", help="refresh installed agents")
+    p_setup.add_argument("--status", action="store_true", help="show what is installed")
+    _add_common(p_setup)
+    p_setup.set_defaults(func=cmd_setup)
 
     p_mcp = sub.add_parser(
         "mcp", help="run the stdio MCP server (requires the risqlet[mcp] extra)"

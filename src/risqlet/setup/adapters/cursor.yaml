@@ -1,0 +1,6 @@
+id: cursor
+name: Cursor
+detect: {binary: cursor, dirs: [".cursor"]}
+components:
+  instructions: {scopes: [project], project: ".cursor/rules/risqlet.mdc", method: md-section}
+  mcp:          {scopes: [project, global], project: ".cursor/mcp.json", global: "~/.cursor/mcp.json", method: json-merge, key: mcpServers}

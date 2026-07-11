@@ -1,0 +1,9 @@
+id: claude
+name: Claude Code
+detect: {binary: claude, dirs: [".claude"]}
+components:
+  instructions: {scopes: [project, global], project: "CLAUDE.md", global: "~/.claude/CLAUDE.md", method: md-section}
+  skills:       {scopes: [project, global], project: ".claude/skills", global: "~/.claude/skills", method: copy-skills}
+  mcp:          {scopes: [project], project: ".mcp.json", method: json-merge, key: mcpServers}
+  hooks:        {scopes: [project], project: ".claude/settings.json", method: json-hooks}
+  commands:     {scopes: [project], project: ".claude/commands", method: copy-commands}

@@ -1,0 +1,6 @@
+id: copilot
+name: GitHub Copilot
+detect: {binary: "", dirs: [".vscode", ".github"]}
+components:
+  instructions: {scopes: [project], project: ".github/copilot-instructions.md", method: md-section}
+  mcp:          {scopes: [project], project: ".vscode/mcp.json", method: json-merge, key: servers}

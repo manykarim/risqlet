@@ -1,0 +1,6 @@
+id: opencode
+name: opencode
+detect: {binary: opencode, dirs: ["~/.config/opencode", "~/.opencode"]}
+components:
+  instructions: {scopes: [project, global], project: "AGENTS.md", global: "~/.config/opencode/AGENTS.md", method: md-section}
+  mcp:          {scopes: [project, global], project: "opencode.jsonc", global: "~/.config/opencode/opencode.jsonc", method: jsonc-merge, key: mcp}

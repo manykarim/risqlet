@@ -24,14 +24,36 @@ agents propose, humans decide.
 ## Quick start
 
 ```bash
-uv sync
-uv run risqlet init          # scaffold .risqlet/ in your project
-uv run risqlet validate      # schema + lifecycle + gate checks
-uv run risqlet score --all   # compute derived priorities from the active policy pack
-uv run risqlet export --fmt strategy-md
-uv run risqlet catalog list          # browse the knowledge packs
-uv run risqlet catalog show techniques.stress-testing
-uv run risqlet catalog search reconciliation
+pip install risqlet        # or: uv tool install risqlet
+risqlet setup              # configure your coding agents (skills, MCP, rules)
+risqlet init               # scaffold .risqlet/ in your project
+risqlet status             # where the analysis stands
+```
+
+`risqlet setup` is the one-command onboarding. It detects your coding agents and
+wires each one up at project or global scope, then `risqlet setup --remove`
+cleanly reverses it. It works both interactively and headlessly:
+
+```bash
+risqlet setup                                   # interactive: pick agents + scope
+risqlet setup --agents claude,cursor --yes      # scriptable / CI (no prompts)
+risqlet setup --all-detected --scope global     # configure every detected agent
+risqlet setup --status                          # what's installed where
+risqlet setup --remove                          # clean uninstall
+```
+
+Supported agents: **Claude Code** (full — skills, MCP, instructions, hooks,
+commands) plus an instructions + MCP tier (and skills where supported) for
+**Cursor, opencode, Codex, Copilot, kilo, pi**. Each gets exactly what it
+supports, reported honestly; MCP-global-only agents (Codex, pi) are flagged.
+
+Core workflow once set up:
+
+```bash
+risqlet validate            # schema + lifecycle + gate checks
+risqlet score --all         # compute derived priorities from the active policy pack
+risqlet export --fmt strategy-md
+risqlet catalog list        # browse the knowledge packs
 ```
 
 ## The `.risqlet/` register format

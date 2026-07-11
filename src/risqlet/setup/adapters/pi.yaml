@@ -1,0 +1,6 @@
+id: pi
+name: pi
+detect: {binary: pi, dirs: ["~/.pi"]}
+components:
+  instructions: {scopes: [project], project: "AGENTS.md", method: md-section}
+  mcp:          {scopes: [project], project: ".mcp.json", method: json-merge, key: mcpServers, note: "pi reads the shared project .mcp.json"}
