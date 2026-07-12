@@ -2,7 +2,7 @@
 
 ## Context
 
-Stack complete (register/CLI, catalogs, skills, MCP). The Claude Code CLI (v2.x) supports headless runs (`claude -p`) with `--permission-mode`, `--allowedTools`, `--add-dir`, and JSON output. Targets are live local repos we must not disturb: `/home/user/workspace/rf-mcp` (Python) and `/home/user/workspace/robotframework-javaui` (Rust/Java).
+Stack complete (register/CLI, catalogs, skills, MCP). The Claude Code CLI (v2.x) supports headless runs (`claude -p`) with `--permission-mode`, `--allowedTools`, `--add-dir`, and JSON output. Targets are live local repos we must not disturb: a Python MCP-server project and a Rust/Java UI-testing library.
 
 ## Goals / Non-Goals
 

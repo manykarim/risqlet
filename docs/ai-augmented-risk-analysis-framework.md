@@ -108,7 +108,7 @@ The generalizable pattern across all of them: **a discrete criticality level, de
 
 For systems that *contain* AI — and for the risk-analysis agent itself:
 
-- **EU AI Act** — risk-tiered regulation (unacceptable / high / limited / minimal); high-risk systems require risk management systems, logging, human oversight. Relevant for any German/EU enterprise deployment (and for you: fiscal-compliance-style thinking applied to AI).
+- **EU AI Act** — risk-tiered regulation (unacceptable / high / limited / minimal); high-risk systems require risk management systems, logging, human oversight. Relevant for any German/EU enterprise deployment (fiscal-compliance-style thinking applied to AI).
 - **NIST AI RMF 1.0** (+ Generative AI Profile) — four functions: **Govern, Map, Measure, Manage**; deliberately compatible with ISO 31000 vocabulary.
 - **ISO/IEC 42001:2023** — AI management systems (the "ISO 27001 of AI").
 - **ISO/IEC 23894:2023** — AI risk management guidance (ISO 31000 applied to AI).
@@ -417,12 +417,12 @@ Everything else — phase playbooks, elicitation prompts, persona briefs, rubric
 Element: `POS checkout → payment terminal (card/EC terminal)` · Guideword: **Late**
 Persona: ops · Catalog aspect under threat: `qa.reliability`, `qa.compliance`
 
-> **R-0031** — *Because the EC terminal acknowledges asynchronously, a late (>30s) confirmation may be recorded as failed while the cardholder was charged, causing double-charge complaints and a fiscal-journal export that disagrees with the PSP settlement file.*
+> **R-0031** — *Because the card terminal acknowledges asynchronously, a late (>30s) confirmation may be recorded as failed while the cardholder was charged, causing double-charge complaints and a fiscal-journal export that disagrees with the PSP settlement file.*
 > elicited_by: guideword:LATE × interface:card-terminal, persona:ops
 > scores (sod-ap-v1): S7 O5 D8 → AP HIGH (D8: no current reconciliation test)
-> mitigations: M-0102 *reduce/detection/detect* — nightly reconciliation check PSP-settlement ↔ fiscal journal (RF suite draft via rf-mcp); M-0103 *reduce/occurrence/prevent* — idempotent booking on terminal retry. residual: chargebacks initiated at issuer remain undetected until settlement +2d.
+> mitigations: M-0102 *reduce/detection/detect* — nightly reconciliation check PSP-settlement ↔ fiscal journal (RF suite draft); M-0103 *reduce/occurrence/prevent* — idempotent booking on terminal retry. residual: chargebacks initiated at issuer remain undetected until settlement +2d.
 
-This is the level of concreteness the framework must reach to be worth more than a workshop — note that it required Phase-0 context (your actual fiscal/payment reality), which is the point.
+This is the level of concreteness the framework must reach to be worth more than a workshop — note that it required Phase-0 context (the team's actual fiscal/payment reality), which is the point.
 
 ---
 
@@ -461,7 +461,7 @@ This is the level of concreteness the framework must reach to be worth more than
 
 | Stage | Scope | Proof point |
 |-------|-------|-------------|
-| **0. Spike** (1–2 wks) | Skill-only: RiskStorming 3-phase playbook + ISO 25010:2023 catalog + S·O·D rubric as SKILL.md set; register as YAML in repo; no server | Run against one real product (e.g. the POS/payment evaluation — fiscal-compliance risks are a perfect testbed); compare to what the human analysis already found |
+| **0. Spike** (1–2 wks) | Skill-only: RiskStorming 3-phase playbook + ISO 25010:2023 catalog + S·O·D rubric as SKILL.md set; register as YAML in repo; no server | Run against one real product (e.g. a POS/payment evaluation — fiscal-compliance risks are a perfect testbed); compare to what the human analysis already found |
 | **1. Determinism** | qrisk-mcp: session/register/score/export; append-only decisions; AP policy table | Backtest vs. one historical incident set |
 | **2. Ensemble** | Persona subagents, isolated contexts, dedupe/cluster tool, disagreement surfacing | Diversity + recall metrics vs. Stage-0 single-pass |
 | **3. Loop closure** | trace tool; rf-mcp charter→test generation; heal-events as Detection evidence; CI re-assessment diffs | One risk demonstrably re-scored by a production failure signal |
