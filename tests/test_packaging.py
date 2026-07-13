@@ -56,10 +56,24 @@ class TestGovernanceFiles:
     def test_changelog_has_010(self):
         assert "[0.1.0]" in (ROOT / "CHANGELOG.md").read_text()
 
-    def test_release_workflow_is_tag_triggered_trusted_publishing(self):
+    def test_release_workflow_is_manual_multimode_token(self):
         wf = (ROOT / ".github/workflows/release.yml").read_text()
-        assert "tags:" in wf and 'v*' in wf
-        assert "id-token: write" in wf  # OIDC trusted publishing, no stored token
+        # manual dispatch only — a tag push must not publish
+        assert "workflow_dispatch:" in wf
+        assert "on:\n  push:" not in wf
+        # three selectable modes
+        for mode in ("gh-draft", "gh-release", "pypi"):
+            assert mode in wf, f"missing mode {mode}"
+        # token-based PyPI auth, OIDC removed
+        assert "PYPI_API_TOKEN" in wf
+        assert "id-token: write" not in wf
+        # artifacts attached to the GitHub release
+        assert "gh release create" in wf and "dist/*" in wf
+
+    def test_release_workflow_is_valid_yaml(self):
+        from ruamel.yaml import YAML
+
+        YAML(typ="safe").load((ROOT / ".github/workflows/release.yml").read_text())
 
 
 class TestWheelContents:

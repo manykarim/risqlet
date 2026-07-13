@@ -1,22 +1,42 @@
-# Publish risqlet to PyPI on a version tag, via Trusted Publishing (OIDC).
+# Manually dispatched release pipeline for risqlet.
 #
-# INERT until a maintainer completes one-time setup (see docs/release-checklist.md):
-#   1. the PyPI project `risqlet` is claimed, and
-#   2. a PyPI Trusted Publisher is configured for this repo + this workflow.
-# Until then, tagging will run the build but the publish step will not be
-# authorized. No API token is stored anywhere.
+# Publishing is a deliberate, human action — pushing a tag does NOT publish
+# anything. Dispatch this workflow (Actions -> release -> Run workflow), pick the
+# tag and a mode:
+#   gh-draft    build + create a DRAFT GitHub release with sdist+wheel attached
+#   gh-release  build + create a PUBLISHED GitHub release with artifacts
+#   pypi        build + publish to PyPI (token) + a published GitHub release
+#
+# PyPI auth uses the repository secret PYPI_API_TOKEN. Add it (Settings ->
+# Secrets and variables -> Actions) before using the `pypi` mode; until then
+# that mode fails fast with a clear message. GitHub releases need no secret —
+# the automatic GITHUB_TOKEN is used.
 name: release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to build and release (e.g. v0.1.0)"
+        required: true
+        type: string
+      mode:
+        description: "What to produce"
+        required: true
+        default: gh-draft
+        type: choice
+        options:
+          - gh-draft
+          - gh-release
+          - pypi
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
       - name: Install uv
         uses: astral-sh/setup-uv@v5
       - name: Test
@@ -31,16 +51,54 @@ jobs:
           name: dist
           path: dist/
 
-  publish:
+  pypi-publish:
     needs: build
+    if: inputs.mode == 'pypi'
     runs-on: ubuntu-latest
     environment: pypi
-    permissions:
-      id-token: write   # required for PyPI Trusted Publishing (OIDC)
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
+      - name: Preflight - require PyPI token
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -z "$PYPI_API_TOKEN" ]; then
+            echo "::error::PYPI_API_TOKEN secret is not set - add it in repo Settings before using the 'pypi' mode."
+            exit 1
+          fi
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  github-release:
+    needs: [build, pypi-publish]
+    # Runs for every mode. In `pypi` mode it waits for a successful publish; in
+    # the GH-only modes pypi-publish is skipped (still allowed to proceed).
+    if: >-
+      always() &&
+      needs.build.result == 'success' &&
+      (needs.pypi-publish.result == 'success' || needs.pypi-publish.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create GitHub release
+        run: |
+          draft=""
+          if [ "${{ inputs.mode }}" = "gh-draft" ]; then draft="--draft"; fi
+          gh release create "${{ inputs.tag }}" dist/* \
+            --title "${{ inputs.tag }}" \
+            --generate-notes $draft

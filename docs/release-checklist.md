@@ -23,20 +23,26 @@ it publishes nothing and claims no external name on its own.
       public repo. Exclude or scrub if any target project is private or the
       findings are sensitive.
 
-## Configure automated publishing
+## Configure publishing
 
 - [ ] `[maintainer]` **Create the GitHub repository** and push `main`.
-- [ ] `[maintainer]` **Configure PyPI Trusted Publishing** for the repo and the
-      `release.yml` workflow (PyPI → project → Publishing → add a GitHub
-      publisher). No API token is stored; the workflow uses OIDC.
-- [ ] `[maintainer]` Create a GitHub environment named `pypi` (optionally with
-      required reviewers) to gate the publish job.
+- [ ] `[maintainer]` **Add the `PYPI_API_TOKEN` secret** (Settings → Secrets and
+      variables → Actions) with a PyPI API token scoped to the `risqlet`
+      project. Only the `pypi` mode needs it; GitHub releases use the automatic
+      `GITHUB_TOKEN`. Until the secret exists, the `pypi` mode fails fast with a
+      clear message — the workflow is safe to keep in place beforehand.
+- [ ] `[maintainer]` (optional) Add required reviewers to the GitHub environment
+      named `pypi` to add a human gate before any PyPI upload.
 
 ## Cut the release
 
 - [ ] `[maintainer]` Follow `RELEASING.md`: green CI, bump version, update
-      `CHANGELOG.md`, tag `v0.1.0`, push the tag. The workflow builds and
-      publishes.
+      `CHANGELOG.md`, tag `vX.Y.Z`, push the tag.
+- [ ] `[maintainer]` **Dispatch the release** (Actions → release → Run workflow)
+      with the tag and a **mode**: `gh-draft` (build + draft GitHub release with
+      artifacts), `gh-release` (build + published GitHub release), or `pypi`
+      (build + PyPI publish + published GitHub release). Publishing is never
+      automatic on a tag push.
 
 ## Optional
 

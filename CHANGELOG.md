@@ -7,6 +7,12 @@ All notable changes to risqlet are documented here. The format follows
 ## [Unreleased]
 
 ### Changed
+- The release workflow is now **manually dispatched and mode-selectable**: a tag
+  push no longer publishes anything. Dispatching `release` with a tag and a mode
+  produces a draft GitHub release, a published GitHub release, or a full PyPI
+  publish — every mode builds, tests, and attaches the sdist + wheel to the
+  GitHub release. PyPI auth moved from Trusted Publishing (OIDC) to an API-token
+  secret (`PYPI_API_TOKEN`); the `pypi` mode fails fast until the secret is set.
 - Guardrail hooks are now **verified in the target environment** before install
   (required tools on PATH, shell syntax, benign-passes/violation-caught behaviour,
   timeout) and install is gated by default (`--no-verify` / `--force` to override);
