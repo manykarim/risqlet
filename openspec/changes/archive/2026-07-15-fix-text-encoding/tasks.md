@@ -68,6 +68,6 @@ machines produce the list before editing anything.
   round-trip test fails when the locale encoding is forced to cp1252, and passes with
   the fix. This is the closest thing to proof available from this host.
 - [x] 6.3 `openspec validate fix-text-encoding --strict`.
-- [ ] 6.4 Push and read all three matrix legs. **Windows is the only leg that can
+- [x] 6.4 Push and read all three matrix legs. **Windows is the only leg that can
   disprove anything here** — until it is green, this is unverified where it matters,
   and should be reported that way.
