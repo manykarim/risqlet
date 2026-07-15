@@ -14,6 +14,7 @@ applied where risqlet has only ever written ASCII (see read_text_strict).
 
 from __future__ import annotations
 
+import io
 import sys
 from pathlib import Path
 
@@ -50,11 +51,23 @@ def read_text_tolerant(path: Path) -> str:
     """
     data = path.read_bytes()
     try:
-        return data.decode("utf-8")
+        return _decode(data, "utf-8")
     except UnicodeDecodeError:
-        text = data.decode(LEGACY_ENCODING)
+        text = _decode(data, LEGACY_ENCODING)
         _report_recovery(path)
         return text
+
+
+def _decode(data: bytes, encoding: str) -> str:
+    """Decode with universal newlines, exactly as Path.read_text() does.
+
+    Not `bytes.decode()`: that skips newline translation, so a CRLF file would keep
+    its \\r characters in the parsed text — and since writes pin newline="\\n", those
+    would be written back as literal carriage returns, leaving mixed line endings in
+    a file we claim is deterministic. Caught by the Windows CI leg, where a CRLF
+    fixture survived into a saved register.
+    """
+    return io.TextIOWrapper(io.BytesIO(data), encoding=encoding, newline=None).read()
 
 
 def _report_recovery(path: Path) -> None:
