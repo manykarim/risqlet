@@ -33,6 +33,7 @@ class TestVerify:
     def test_good_lint_hook_passes(self, tmp_path):
         assert verify_guardrail(rendered("lint-format-posttool"), tmp_path).ok
 
+    @pytest.mark.posix_only  # on Windows the shell hook is refused before tool preflight
     def test_missing_tool_fails(self, tmp_path):
         g = RenderedGuardrail(
             template_id="x", surface="claude-hook", enforcement="hard", params={},
@@ -93,8 +94,14 @@ class TestVerify:
         assert not any(c.name == "tool:bash" for c in r.checks)
         assert not any(c.name == "syntax" for c in r.checks)
 
+    @pytest.mark.posix_only  # on Windows the answer is "unsupported", not "no bash"
     def test_shell_hook_still_requires_its_shell(self, tmp_path, monkeypatch):
-        """spec: hook-verification — a shell hook without bash still fails."""
+        """spec: hook-verification — a shell hook without bash still fails.
+
+        POSIX-only: on Windows a shell hook is refused wholesale by policy before
+        the tool preflight runs, so "bash is missing" is never the reason reported.
+        test_shell_hook_reports_unsupported_on_windows covers that path instead.
+        """
         real_which = shutil.which
         monkeypatch.setattr("risqlet.guardrails.verify.shutil.which",
                             lambda t, *a, **k: None if t == "bash" else real_which(t))
