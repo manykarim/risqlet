@@ -119,7 +119,7 @@ class TestPackLoading:
             "derived:\n  bucket:\n    type: lookup\n    bands:\n"
             "      - {when: {effort: '>=4'}, value: BIG}\n"
             "      - {default: SMALL}\n"
-        )
+        , encoding="utf-8")
         policy = load_policy("custom-v1", user_dir=tmp_path)
         assert policy.compute({"effort": 5}, anchors(1))["bucket"] == "BIG"
 
@@ -174,6 +174,6 @@ class TestPackLoading:
     def test_id_mismatch_rejected(self, tmp_path):
         (tmp_path / "alias.yaml").write_text(
             "id: other\nfactors:\n  a: {min: 1, max: 2}\n"
-        )
+        , encoding="utf-8")
         with pytest.raises(PolicyError, match="does not match"):
             load_policy("alias", user_dir=tmp_path)

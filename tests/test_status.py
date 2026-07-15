@@ -10,7 +10,7 @@ from tests.conftest import append_raw_event
 
 
 def snapshot(store: Store) -> dict:
-    return {p.name: p.read_text() for p in store.root.rglob("*") if p.is_file()}
+    return {p.name: p.read_text(encoding="utf-8") for p in store.root.rglob("*") if p.is_file()}
 
 
 class TestBuildStatus:
@@ -42,13 +42,17 @@ class TestBuildStatus:
             populated_register, ts="t", type="status_change", risk="R-0001",
             principal="human:many", note="", to="reviewed", **{"from": "proposed"})
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace("status: proposed", "status: reviewed"))
+        path.write_text(path.read_text(encoding="utf-8").replace("status: proposed",
+                                                                 "status: reviewed"),
+                                                                 encoding="utf-8")
         report = build_status(populated_register)
         assert any("await scoring" in h and "R-0001" in h for h in report["pending"])
 
     def test_uncovered_accepted_hint(self, populated_register):
         path = populated_register.register_dir / "R-0002.yaml"
-        path.write_text(path.read_text().replace("status: proposed", "status: accepted"))
+        path.write_text(path.read_text(encoding="utf-8").replace("status: proposed",
+                                                                 "status: accepted"),
+                                                                 encoding="utf-8")
         report = build_status(populated_register)
         assert any("lack mitigations" in h and "R-0002" in h for h in report["pending"])
         assert report["mitigation"]["uncovered"] == ["R-0002"]
@@ -69,7 +73,7 @@ class TestBuildStatus:
         assert any("no quality aspects" in h for h in build_status(store)["pending"])
 
     def test_invalid_file_tolerated_and_named(self, populated_register):
-        (populated_register.register_dir / "R-0099.yaml").write_text("id: nope\n")
+        (populated_register.register_dir / "R-0099.yaml").write_text("id: nope\n", encoding="utf-8")
         report = build_status(populated_register)
         assert "R-0099.yaml" in report["invalid_files"]
         assert any("unparseable" in h for h in report["pending"])

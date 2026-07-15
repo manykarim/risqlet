@@ -6,6 +6,23 @@ All notable changes to risqlet are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- **Text I/O is now explicitly UTF-8 everywhere, fixing silent data corruption on
+  Windows.** risqlet read and wrote every file — the register, `config.yaml`,
+  catalog packs, agent configs — in Python's *locale* encoding. That is UTF-8 on
+  Linux and macOS, so it never showed there, but cp1252 on Windows, where it failed
+  two ways: reads of our own UTF-8 data corrupted silently (an em-dash, present in
+  every catalog pack, became `â€"` with nothing raising), and writes of text outside
+  cp1252 crashed with `UnicodeEncodeError` — a risk statement containing `→` or CJK
+  was enough. `git diff` output and hook stdout were exposed too, via
+  `subprocess(text=True)`. No on-disk format changed: every file was already UTF-8;
+  risqlet now reads them as what they are. `events.jsonl` was never affected —
+  `json.dumps` escapes non-ASCII to `\uXXXX` by default.
+- **Output no longer depends on the host's line endings.** Text writes pin
+  `newline="\n"`, so a register or export written on Windows is byte-identical to
+  one written on Linux. Python's text mode had been translating `\n` to `\r\n`,
+  quietly making "deterministic output" untrue across platforms.
+
 ### Added
 - **Cross-platform CI.** The `test` workflow now runs the full suite on Linux,
   macOS, and Windows on every push and PR. Each platform also builds the wheel,

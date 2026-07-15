@@ -205,7 +205,7 @@ def load_policy(policy_id: str, user_dir: Path | None = None) -> Policy:
     yaml = YAML(typ="safe")
     for path in candidates:
         if path.is_file():
-            with path.open() as f:
+            with path.open(encoding="utf-8") as f:
                 data = yaml.load(f)
             policy = Policy.from_dict(data, source=str(path))
             if policy.id != policy_id:

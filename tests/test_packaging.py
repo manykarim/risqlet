@@ -13,6 +13,8 @@ from typing import NamedTuple
 
 import pytest
 
+from tests.conftest import read_utf8
+
 ROOT = Path(__file__).resolve().parents[1]
 
 # every agent risqlet ships an adapter for — read from the adapter data so a new
@@ -21,7 +23,7 @@ ADAPTER_IDS = [p.stem for p in (ROOT / "src/risqlet/setup/adapters").glob("*.yam
 
 
 def pyproject() -> dict:
-    return tomllib.loads((ROOT / "pyproject.toml").read_text())
+    return tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
 
 class TestMetadata:
@@ -46,7 +48,7 @@ class TestMetadata:
         """
         from ruamel.yaml import YAML
 
-        wf = YAML(typ="safe").load((ROOT / ".github/workflows/test.yml").read_text())
+        wf = YAML(typ="safe").load(read_utf8(ROOT / ".github/workflows/test.yml"))
         runners = wf["jobs"]["test"]["strategy"]["matrix"]["os"]
         claimed = {c for c in pyproject()["project"]["classifiers"]
                    if c.startswith("Operating System")}
@@ -79,19 +81,19 @@ class TestGovernanceFiles:
         assert (ROOT / name).exists(), f"{name} is missing"
 
     def test_notice_has_mitre_and_runtime_pointer(self):
-        notice = (ROOT / "NOTICE").read_text()
+        notice = (ROOT / "NOTICE").read_text(encoding="utf-8")
         assert "MITRE" in notice
         assert "risqlet catalog licenses" in notice
 
     def test_contributing_has_clean_room_affirmation(self):
-        assert "CLEAN-ROOM.md" in (ROOT / "CONTRIBUTING.md").read_text()
-        assert "without consulting licensed source text" in (ROOT / "CONTRIBUTING.md").read_text()
+        assert "CLEAN-ROOM.md" in (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+        assert "without consulting licensed source text" in read_utf8(ROOT / "CONTRIBUTING.md")
 
     def test_changelog_has_010(self):
-        assert "[0.1.0]" in (ROOT / "CHANGELOG.md").read_text()
+        assert "[0.1.0]" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
     def test_release_workflow_is_manual_multimode_token(self):
-        wf = (ROOT / ".github/workflows/release.yml").read_text()
+        wf = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
         # manual dispatch only — a tag push must not publish
         assert "workflow_dispatch:" in wf
         assert "on:\n  push:" not in wf
@@ -107,7 +109,7 @@ class TestGovernanceFiles:
     def test_release_workflow_is_valid_yaml(self):
         from ruamel.yaml import YAML
 
-        YAML(typ="safe").load((ROOT / ".github/workflows/release.yml").read_text())
+        YAML(typ="safe").load((ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8"))
 
 
 class CleanInstall(NamedTuple):
@@ -120,7 +122,7 @@ class CleanInstall(NamedTuple):
 def build_wheel(out_dir: Path) -> str:
     result = subprocess.run(
         ["uv", "build", "--wheel", "-o", str(out_dir)],
-        cwd=ROOT, capture_output=True, text=True,
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
     )
     assert result.returncode == 0, result.stderr
     return sorted(glob.glob(str(out_dir / "*.whl")))[-1]
@@ -146,7 +148,7 @@ def clean_install(tmp_path_factory):
     bin_dir = venv / ("Scripts" if os.name == "nt" else "bin")
     py = bin_dir / ("python.exe" if os.name == "nt" else "python")
     r = subprocess.run([str(py), "-m", "pip", "install", "--quiet", wheel],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 0, r.stderr
     exe = bin_dir / ("risqlet.exe" if os.name == "nt" else "risqlet")
     assert exe.exists(), f"console script missing from the wheel install: {exe}"
@@ -168,7 +170,7 @@ def run_installed(inst: "CleanInstall", *args: str) -> subprocess.CompletedProce
     env = dict(os.environ)
     env["PATH"] = str(inst.bin_dir) + os.pathsep + env["PATH"]
     return subprocess.run([inst.exe, *args], cwd=inst.work, env=env,
-                          capture_output=True, text=True, timeout=120)
+                          capture_output=True, text=True, encoding="utf-8", timeout=120)
 
 
 @pytest.mark.slow
@@ -187,7 +189,7 @@ class TestCleanInstall:
         """The thing under test must be the wheel, not the checkout beside it."""
         r = subprocess.run(
             [clean_install.py, "-c", "import risqlet; print(risqlet.__file__)"],
-            cwd=clean_install.work, capture_output=True, text=True, timeout=60)
+            cwd=clean_install.work, capture_output=True, text=True, encoding="utf-8", timeout=60)
         assert r.returncode == 0, r.stderr
         resolved = Path(r.stdout.strip()).resolve()
         assert not resolved.is_relative_to(ROOT / "src"), (
@@ -256,7 +258,7 @@ class TestCleanInstall:
         assert r.returncode == 0, r.stderr
         payload = json.loads(r.stdout)
         assert payload["skipped"] == [], f"hook was skipped: {payload['skipped']}"
-        settings = json.loads((proj / ".claude" / "settings.json").read_text())
+        settings = json.loads((proj / ".claude" / "settings.json").read_text(encoding="utf-8"))
         cmd = [h["command"] for e in settings["hooks"]["PostToolUse"]
                for h in e["hooks"]][0]
         # run the command exactly as written into settings.json, resolving `risqlet`
@@ -268,7 +270,7 @@ class TestCleanInstall:
         proc = subprocess.run([*argv, "--dir", str(proj)], env=env,
                               cwd=clean_install.work,
                               input='{"tool_input": {"file_path": "src/x.py"}}',
-                              capture_output=True, text=True, timeout=120)
+                              capture_output=True, text=True, encoding="utf-8", timeout=120)
         assert proc.returncode == 0, proc.stderr
 
 

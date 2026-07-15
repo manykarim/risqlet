@@ -128,7 +128,8 @@ def tool_get_guidance(topic: str) -> dict:
             f"unknown topic {topic!r} (valid: {', '.join(sorted(GUIDANCE_TOPICS))})"
         )
     skill, relative = GUIDANCE_TOPICS[topic]
-    return {"topic": topic, "content": (skills_root() / skill / relative).read_text()}
+    return {"topic": topic,
+            "content": (skills_root() / skill / relative).read_text(encoding="utf-8")}
 
 
 # -- register writes (gate-preserving) ----------------------------------------

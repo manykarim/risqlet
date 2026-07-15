@@ -49,7 +49,7 @@ def store(tmp_path):
 
 def add_risk(store, id="R-0001", sev=9, status="accepted", barrier="prevent", n="0001"):
     (store.register_dir / f"{id}.yaml").write_text(
-        CONF_RISK.format(id=id, sev=sev, status=status, barrier=barrier, n=n))
+        CONF_RISK.format(id=id, sev=sev, status=status, barrier=barrier, n=n), encoding="utf-8")
 
 
 class TestTemplates:
@@ -101,11 +101,11 @@ class TestSelection:
 
     def test_deterministic_and_read_only(self, store, tmp_path):
         add_risk(store)
-        snap = {p.name: p.read_text() for p in store.register_dir.iterdir()}
+        snap = {p.name: p.read_text(encoding="utf-8") for p in store.register_dir.iterdir()}
         first = build_plan(store).to_dict()
         second = build_plan(store).to_dict()
         assert first == second
-        assert {p.name: p.read_text() for p in store.register_dir.iterdir()} == snap
+        assert {p.name: p.read_text(encoding="utf-8") for p in store.register_dir.iterdir()} == snap
 
     def test_dedupe_across_risks(self, store):
         add_risk(store, id="R-0001", n="0001")
@@ -129,7 +129,7 @@ class TestHonesty:
         (store.register_dir / "R-0009.yaml").write_text(
             CONF_RISK.format(id="R-0009", sev=9, status="accepted", barrier="prevent", n="0009")
             .replace("[iso25010.confidentiality, iso25010.security]", "[companyx.thing]")
-            .replace("owasp-web.cryptographic-failures", "owasp-web.injection"))
+            .replace("owasp-web.cryptographic-failures", "owasp-web.injection"), encoding="utf-8")
         plan = build_plan(store)
         assert all(g.enforcement == "soft" for g in plan.guardrails)
         assert any("advisory" in a and "R-0009" in a for a in plan.advisories)
@@ -143,7 +143,7 @@ class TestHonesty:
         (store.register_dir / "R-0005.yaml").write_text(
             CONF_RISK.format(id="R-0005", sev=3, status="accepted", barrier="prevent", n="0005")
             .replace("[iso25010.confidentiality, iso25010.security]", "[companyx.thing]")
-            .replace("owasp-web.cryptographic-failures", "owasp-web.injection"))
+            .replace("owasp-web.cryptographic-failures", "owasp-web.injection"), encoding="utf-8")
         assert build_plan(store).advisories == []
 
 
@@ -152,7 +152,7 @@ class TestInstallAndDiff:
         add_risk(store)
         out = tmp_path / "out"
         result = install_plan(store, build_plan(store), "path", out)
-        bundle = (out / "guardrails.md").read_text()
+        bundle = (out / "guardrails.md").read_text(encoding="utf-8")
         assert "risqlet:R-0001:prevent:secret-scan-posttool" in bundle
         assert (out / ".risqlet-guardrails.lock.json").exists()
         assert result["guardrails"] >= 4
@@ -160,7 +160,7 @@ class TestInstallAndDiff:
     def test_install_agents_md_section(self, store, tmp_path):
         add_risk(store)
         install_plan(store, build_plan(store), "agents-md", tmp_path)
-        agents = (tmp_path / "AGENTS.md").read_text()
+        agents = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
         assert "risqlet:guardrails:begin" in agents
         assert "agents-no-secret-logging" in agents
 
@@ -168,21 +168,22 @@ class TestInstallAndDiff:
         add_risk(store)
         install_plan(store, build_plan(store), "agents-md", tmp_path)
         install_plan(store, build_plan(store), "agents-md", tmp_path)  # again
-        agents = (tmp_path / "AGENTS.md").read_text()
+        agents = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
         assert agents.count("risqlet:guardrails:begin") == 1  # idempotent
 
     def test_agents_md_preserves_existing_content(self, store, tmp_path):
         add_risk(store)
-        (tmp_path / "AGENTS.md").write_text("# My project rules\n\nDo the thing.\n")
+        (tmp_path / "AGENTS.md").write_text("# My project rules\n\nDo the thing.\n",
+                                            encoding="utf-8")
         install_plan(store, build_plan(store), "agents-md", tmp_path)
-        agents = (tmp_path / "AGENTS.md").read_text()
+        agents = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
         assert "# My project rules" in agents and "Do the thing." in agents
         assert "risqlet:guardrails:begin" in agents
 
     def test_claude_settings_merge(self, store, tmp_path):
         add_risk(store)
         _install_claude(tmp_path, build_plan(store), force=False)
-        settings = json.loads((tmp_path / ".claude" / "settings.json").read_text())
+        settings = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
         assert "hooks" in settings
         assert any("# risqlet:" in h["command"]
                    for e in settings["hooks"]["PostToolUse"] for h in e["hooks"])
@@ -194,10 +195,11 @@ class TestInstallAndDiff:
         settings_dir.mkdir()
         (settings_dir / "settings.json").write_text(json.dumps({
             "hooks": {"PostToolUse": [{"matcher": "Write",
-                      "hooks": [{"type": "command", "command": "my-own-hook"}]}]}}))
+                      "hooks": [{"type": "command", "command": "my-own-hook"}]}]}}),
+                          encoding="utf-8")
         _install_claude(tmp_path, build_plan(store), force=False)
         _install_claude(tmp_path, build_plan(store), force=False)  # twice
-        settings = json.loads((settings_dir / "settings.json").read_text())
+        settings = json.loads((settings_dir / "settings.json").read_text(encoding="utf-8"))
         cmds = [h["command"] for e in settings["hooks"]["PostToolUse"] for h in e["hooks"]]
         assert "my-own-hook" in cmds  # user hook preserved
         assert sum("# risqlet:" in c for c in cmds) == 1  # managed hook not duplicated
@@ -206,11 +208,11 @@ class TestInstallAndDiff:
         # a standalone bundle file (path target) with foreign content is protected
         add_risk(store)
         dest = tmp_path / "bundle.md"
-        dest.write_text("hand-written, no markers\n")
+        dest.write_text("hand-written, no markers\n", encoding="utf-8")
         with pytest.raises(GuardrailError, match="--force"):
             install_plan(store, build_plan(store), "path", dest)
         install_plan(store, build_plan(store), "path", dest, force=True)  # ok
-        assert "risqlet:guardrails:begin" in dest.read_text()
+        assert "risqlet:guardrails:begin" in dest.read_text(encoding="utf-8")
 
     def test_refuses_install_inside_register(self, store):
         add_risk(store)
@@ -223,7 +225,9 @@ class TestInstallAndDiff:
         assert diff_target(store, tmp_path) == {"stale": [], "missing": [], "drift": []}
         # reject the risk -> plan drops it -> installed markers go stale
         path = store.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace("status: accepted", "status: rejected"))
+        path.write_text(path.read_text(encoding="utf-8").replace("status: accepted",
+                                                                 "status: rejected"),
+                                                                 encoding="utf-8")
         report = diff_target(store, tmp_path)
         assert report["stale"] and not report["missing"]
 
@@ -234,15 +238,16 @@ class TestInstallAndDiff:
 
     def test_register_untouched_and_validate_unaffected(self, populated_register, tmp_path):
         # accept R-0001 with a matching event so validate passes, then guardrails
-        from tests.conftest import append_raw_event
+        from tests.conftest import append_raw_event, read_utf8
         for frm, to in [("proposed", "reviewed"), ("reviewed", "accepted")]:
             append_raw_event(populated_register, ts="t", type="status_change", risk="R-0001",
                              principal="human:many", note="", to=to, **{"from": frm})
         p = populated_register.register_dir / "R-0001.yaml"
-        p.write_text(p.read_text().replace("status: proposed", "status: accepted"))
+        p.write_text(p.read_text(encoding="utf-8").replace("status: proposed", "status: accepted"),
+                                                           encoding="utf-8")
         before = validate_register(populated_register).to_dict()
-        snap = {x.name: x.read_text() for x in populated_register.register_dir.iterdir()}
+        snap = {x.name: read_utf8(x) for x in populated_register.register_dir.iterdir()}
         install_plan(populated_register, build_plan(populated_register), "agents-md", tmp_path)
         after = validate_register(populated_register).to_dict()
         assert before == after
-        assert {x.name: x.read_text() for x in populated_register.register_dir.iterdir()} == snap
+        assert {x.name: read_utf8(x) for x in populated_register.register_dir.iterdir()} == snap

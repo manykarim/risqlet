@@ -33,7 +33,7 @@ def write(directory: Path = SCHEMAS_DIR) -> list[Path]:
     written = []
     for filename, text in generate().items():
         path = directory / filename
-        path.write_text(text)
+        path.write_text(text, encoding="utf-8", newline="\n")
         written.append(path)
     return written
 

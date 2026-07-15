@@ -66,7 +66,7 @@ class TestSecurityPacks:
             "prompt_ref: 'mitre-attack.enterprise-tactics:initial-access', "
             "evidence: ['src/x.py']}\n"
             "status: proposed\nmitigations: []\n"
-        )
+        , encoding="utf-8")
         report = validate_register(store)
         assert report.passed
         # the security refs resolve -> no unknown-slug/word catalog warnings

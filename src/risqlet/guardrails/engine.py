@@ -47,7 +47,7 @@ def load_templates() -> list[GuardrailTemplate]:
     out = []
     for path in sorted(TEMPLATES_DIR.glob("*.yaml")):
         try:
-            out.append(GuardrailTemplate.model_validate(yaml.load(path.read_text())))
+            out.append(GuardrailTemplate.model_validate(yaml.load(path.read_text(encoding="utf-8"))))
         except ValidationError as exc:
             raise GuardrailError(f"{path.name}: invalid guardrail template: {exc}") from exc
     return out
@@ -103,7 +103,7 @@ def _detect_test_command(store: Store) -> str | None:
     if (root / "package.json").exists():
         return "npm test"
     makefile = root / "Makefile"
-    if makefile.exists() and re.search(r"^test:", makefile.read_text(), flags=re.M):
+    if makefile.exists() and re.search(r"^test:", makefile.read_text(encoding="utf-8"), flags=re.M):
         return "make test"
     return None
 
@@ -244,7 +244,7 @@ def _read_lock(root: Path) -> list[dict]:
     path = _lock_path(root)
     if not path.exists():
         return []
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _write_lock(root: Path, plan: Plan) -> None:
@@ -255,7 +255,8 @@ def _write_lock(root: Path, plan: Plan) -> None:
             "enforcement": g.enforcement, "markers": g.markers,
             "risks": g.risks, "hash": _content_hash(g.content),
         })
-    _lock_path(root).write_text(json.dumps(entries, indent=2, sort_keys=True) + "\n")
+    _lock_path(root).write_text(json.dumps(entries, indent=2, sort_keys=True) + "\n",
+                                encoding="utf-8", newline="\n")
 
 
 def _render_section(plan: Plan) -> str:
@@ -320,7 +321,7 @@ def install_plan(store: Store, plan: Plan, target: str, root: Path,
             else root / ("guardrails.md" if target == "path" else "risqlet-guardrails.md")
         )
         section = _render_section(plan)
-        existing = dest.read_text() if dest.exists() else ""
+        existing = dest.read_text(encoding="utf-8") if dest.exists() else ""
         if BEGIN in existing and END in existing:
             # replace the managed section in place; everything else is preserved
             pre = existing.split(BEGIN)[0]
@@ -335,7 +336,7 @@ def install_plan(store: Store, plan: Plan, target: str, root: Path,
         else:
             new = section
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(new)
+        dest.write_text(new, encoding="utf-8", newline="\n")
         lock_root = dest.parent
     elif target == "claude-project":
         dest = _install_claude(root, plan, force)
@@ -352,7 +353,7 @@ def install_plan(store: Store, plan: Plan, target: str, root: Path,
 
 def _install_claude(root: Path, plan: Plan, force: bool) -> Path:
     settings = root / ".claude" / "settings.json"
-    data = json.loads(settings.read_text()) if settings.exists() else {}
+    data = json.loads(settings.read_text(encoding="utf-8")) if settings.exists() else {}
     # remove any previously risqlet-managed hooks (command carries a marker comment)
     hooks = data.get("hooks", {})
     for event in list(hooks):
@@ -388,7 +389,8 @@ def _install_claude(root: Path, plan: Plan, force: bool) -> Path:
     if hooks:
         data["hooks"] = hooks
     settings.parent.mkdir(parents=True, exist_ok=True)
-    settings.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+    settings.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8", newline="\n")
     return settings
 
 

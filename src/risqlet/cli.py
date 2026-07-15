@@ -90,7 +90,7 @@ def cmd_export(args) -> int:
         return 1
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(output)
+        args.output.write_text(output, encoding="utf-8", newline="\n")
         if args.json:
             print(json.dumps({"format": args.fmt, "written": str(args.output)}))
         else:

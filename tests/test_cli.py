@@ -14,7 +14,8 @@ class TestInit:
 
     def test_init_refuses_existing(self, tmp_path, capsys):
         assert main(["init", "--dir", str(tmp_path)]) == 0
-        (tmp_path / ".risqlet" / "register" / "R-0001.yaml").write_text("id: R-0001\n")
+        (tmp_path / ".risqlet" / "register" / "R-0001.yaml").write_text("id: R-0001\n",
+                                                                        encoding="utf-8")
         assert main(["init", "--dir", str(tmp_path)]) == 1
         assert "refusing to overwrite" in capsys.readouterr().err
 
@@ -33,7 +34,7 @@ class TestValidate:
         assert isinstance(payload["findings"], list)
 
     def test_failure_exit_code(self, populated_register, capsys):
-        (populated_register.register_dir / "R-0003.yaml").write_text("id: nope\n")
+        (populated_register.register_dir / "R-0003.yaml").write_text("id: nope\n", encoding="utf-8")
         assert main(["validate", "--dir", str(populated_register.root)]) == 1
         assert "FAIL" in capsys.readouterr().out
 
@@ -67,7 +68,7 @@ class TestExport:
         target = tmp_path / "out" / "strategy.md"
         assert main(["export", "--fmt", "strategy-md", "-o", str(target),
                      "--dir", str(populated_register.root)]) == 0
-        assert target.read_text().startswith("# Test Strategy")
+        assert target.read_text(encoding="utf-8").startswith("# Test Strategy")
 
     def test_all_formats(self, populated_register, capsys):
         for fmt in ("register-yaml", "strategy-md", "trace-matrix-csv"):

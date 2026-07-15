@@ -84,7 +84,8 @@ def init_register(project_dir: Path, project_name: str | None = None) -> Path:
         raise StoreError(f"{risqlet} already contains a register — refusing to overwrite")
     register.mkdir(parents=True, exist_ok=True)
     name = project_name or project_dir.resolve().name
-    (risqlet / CONFIG_FILE).write_text(_STARTER_CONFIG.format(project=name))
+    (risqlet / CONFIG_FILE).write_text(_STARTER_CONFIG.format(project=name),
+                                       encoding="utf-8", newline="\n")
     (risqlet / EVENTS_FILE).touch()
     return risqlet
 
@@ -108,13 +109,13 @@ class Store:
         return self.root / CONFIG_FILE
 
     def load_config_raw(self) -> dict:
-        with self.config_path.open() as f:
+        with self.config_path.open(encoding="utf-8") as f:
             return self._yaml.load(f) or {}
 
     def save_config_raw(self, data: dict) -> None:
         buf = io.StringIO()
         self._yaml.dump(data, buf)
-        self.config_path.write_text(buf.getvalue())
+        self.config_path.write_text(buf.getvalue(), encoding="utf-8", newline="\n")
 
     # -- risks ---------------------------------------------------------------
     @property
@@ -129,7 +130,7 @@ class Store:
     def load_risk_files(self) -> list[RiskFile]:
         out = []
         for path in self.risk_paths():
-            with path.open() as f:
+            with path.open(encoding="utf-8") as f:
                 data = self._yaml.load(f)
             out.append(RiskFile(path=path, data=data or {}))
         return out
@@ -137,7 +138,7 @@ class Store:
     def save_risk(self, risk_file: RiskFile) -> None:
         buf = io.StringIO()
         self._yaml.dump(risk_file.data, buf)
-        risk_file.path.write_text(buf.getvalue())
+        risk_file.path.write_text(buf.getvalue(), encoding="utf-8", newline="\n")
 
     def next_risk_id(self) -> str:
         return f"R-{self._next_number('R'):04d}"
@@ -166,7 +167,7 @@ class Store:
 
     def append_event(self, event: Event) -> None:
         line = json.dumps(event.model_dump(by_alias=True, exclude_none=True), sort_keys=True)
-        with self.events_path.open("a") as f:
+        with self.events_path.open("a", encoding="utf-8", newline="\n") as f:
             f.write(line + "\n")
 
     def read_events(self) -> list[tuple[int, dict]]:
@@ -174,7 +175,8 @@ class Store:
         if not self.events_path.exists():
             return []
         out = []
-        for lineno, line in enumerate(self.events_path.read_text().splitlines(), start=1):
+        lines = self.events_path.read_text(encoding="utf-8").splitlines()
+        for lineno, line in enumerate(lines, start=1):
             if not line.strip():
                 continue
             try:

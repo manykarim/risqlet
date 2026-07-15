@@ -7,6 +7,7 @@ from risqlet.scoring import score_risks
 from risqlet.status import build_status
 from risqlet.store import Store, init_register
 from risqlet.validate import validate_register
+from tests.conftest import read_utf8
 
 RISK_TEMPLATE = """\
 schema_version: 1
@@ -29,7 +30,7 @@ def write_risk(store, id, statement, aspects="iso25010.reliability", method="man
     (store.register_dir / f"{id}.yaml").write_text(RISK_TEMPLATE.format(
         id=id, statement=statement, aspects=aspects, method=method,
         prompt_ref=prompt_ref, evidence=evidence, scores=scores,
-        status=status, mitigations=mitigations))
+        status=status, mitigations=mitigations), encoding="utf-8")
 
 
 @pytest.fixture
@@ -92,11 +93,11 @@ class TestDedupe:
     def test_deterministic_and_read_only(self, store):
         write_risk(store, "R-0001", NEAR_DUP_A)
         write_risk(store, "R-0002", NEAR_DUP_B)
-        before = {p.name: p.read_text() for p in store.register_dir.iterdir()}
+        before = {p.name: p.read_text(encoding="utf-8") for p in store.register_dir.iterdir()}
         first = [c.to_dict() for c in find_clusters(store)]
         second = [c.to_dict() for c in find_clusters(store)]
         assert first == second
-        assert {p.name: p.read_text() for p in store.register_dir.iterdir()} == before
+        assert {p.name: read_utf8(p) for p in store.register_dir.iterdir()} == before
 
 
 class TestMerge:
@@ -128,10 +129,10 @@ class TestMerge:
     def test_reviewed_duplicate_refused(self, store):
         write_risk(store, "R-0001", NEAR_DUP_A)
         write_risk(store, "R-0002", NEAR_DUP_B, status="reviewed")
-        before = {p.name: p.read_text() for p in store.register_dir.iterdir()}
+        before = {p.name: p.read_text(encoding="utf-8") for p in store.register_dir.iterdir()}
         with pytest.raises(EnsembleError, match="only 'proposed'"):
             merge(store, "R-0001", ["R-0002"])
-        assert {p.name: p.read_text() for p in store.register_dir.iterdir()} == before
+        assert {p.name: read_utf8(p) for p in store.register_dir.iterdir()} == before
 
     def test_terminal_survivor_refused(self, store):
         write_risk(store, "R-0001", NEAR_DUP_A, status="rejected")
@@ -206,7 +207,8 @@ class TestDisagreement:
         write_risk(store, "R-0001", NEAR_DUP_A, scores=TWO_SCORES)
         score_risks(store)
         path = store.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace("value: 0.15", "value: 0.01"))
+        path.write_text(path.read_text(encoding="utf-8").replace("value: 0.15", "value: 0.01"),
+                                                                 encoding="utf-8")
         report = validate_register(store)
         assert any("disagreement" in f.field for f in report.findings
                    if f.severity == "error")

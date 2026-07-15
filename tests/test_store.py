@@ -66,11 +66,11 @@ class TestDiscovery:
 class TestRoundTrip:
     def test_comments_preserved_on_rewrite(self, register):
         path = register.register_dir / "R-0001.yaml"
-        path.write_text(RISK_WITH_COMMENTS)
+        path.write_text(RISK_WITH_COMMENTS, encoding="utf-8")
         rf = register.load_risk_files()[0]
         rf.data["scores"][0]["derived"] = {"rpn": 280, "action_priority": "HIGH"}
         register.save_risk(rf)
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         assert "# reviewed in workshop 2026-07-01" in text
         assert "# ranked #1 this quarter" in text
         assert "rpn: 280" in text
@@ -79,9 +79,87 @@ class TestRoundTrip:
         cfg = register.load_config_raw()
         cfg["phase"] = "aspects"
         register.save_config_raw(cfg)
-        text = register.config_path.read_text()
+        text = register.config_path.read_text(encoding="utf-8")
         assert "phase: aspects" in text
         assert "forced prioritization" in text  # starter comment survives
+
+
+class TestTextEncoding:
+    """spec: risk-register — register files are UTF-8 on every platform.
+
+    The suite could not catch the locale-encoding bug because nothing ever put a
+    non-ASCII character through the store: on Linux/macOS the locale is UTF-8, so
+    the omission was invisible, while on Windows (cp1252) `→` raised
+    UnicodeEncodeError on write and `—` silently became `â€"` on read.
+    """
+
+    # → and 決済 cannot be encoded in cp1252 at all (hard crash);
+    # — and “ ” can, but decode back as mojibake (silent corruption)
+    NON_ASCII = "Because the flow reverts — request → timeout, 決済 may be “lost”"
+
+    def test_non_ascii_risk_round_trips(self, register):
+        path = register.register_dir / "R-0001.yaml"
+        path.write_text(RISK_WITH_COMMENTS, encoding="utf-8")
+        rf = register.load_risk_files()[0]
+        rf.data["statement"] = self.NON_ASCII
+        register.save_risk(rf)
+
+        reloaded = register.load_risk_files()[0]
+        assert reloaded.data["statement"] == self.NON_ASCII
+
+    def test_risk_bytes_on_disk_are_utf8(self, register):
+        """Reading back through the same wrong assumption that wrote it would pass
+        even when both halves are broken — so assert the bytes, not the round-trip."""
+        path = register.register_dir / "R-0001.yaml"
+        path.write_text(RISK_WITH_COMMENTS, encoding="utf-8")
+        rf = register.load_risk_files()[0]
+        rf.data["statement"] = self.NON_ASCII
+        register.save_risk(rf)
+
+        raw = path.read_bytes()
+        assert self.NON_ASCII in raw.decode("utf-8")  # not the host's locale
+        with pytest.raises(UnicodeDecodeError):
+            raw.decode("ascii")  # proves the fixture is actually exercising non-ASCII
+
+    def test_writes_use_lf_not_the_host_line_ending(self, register):
+        """Deterministic output cannot depend on the OS: text mode would emit CRLF
+        on Windows for the same register."""
+        path = register.register_dir / "R-0001.yaml"
+        path.write_text(RISK_WITH_COMMENTS, encoding="utf-8")
+        rf = register.load_risk_files()[0]
+        register.save_risk(rf)
+        assert b"\r\n" not in path.read_bytes()
+
+    def test_config_non_ascii_round_trips(self, register):
+        cfg = register.load_config_raw()
+        cfg["project"] = "決済 — order → flow"
+        register.save_config_raw(cfg)
+        assert register.load_config_raw()["project"] == "決済 — order → flow"
+        assert b"\r\n" not in register.config_path.read_bytes()
+
+    def test_event_log_accepts_non_ascii(self, register):
+        """The log round-trips non-ASCII, though not for the reason you'd expect.
+
+        `json.dumps` defaults to ensure_ascii=True, so events.jsonl is written as
+        pure ASCII with \\uXXXX escapes — which means it was never exposed to the
+        locale-encoding bug, unlike the YAML register beside it. This test pins
+        that: if someone ever passes ensure_ascii=False for readability, the file
+        gains real non-ASCII bytes and the encoding on the handle starts to matter.
+        """
+        register.append_event(Event(
+            ts="2026-07-15T00:00:00Z", type="status_change", risk="R-0001",
+            **{"from": "proposed"}, to="reviewed", principal="human:tester",
+            note=self.NON_ASCII))
+        raw = register.events_path.read_bytes()
+        assert register.read_events()[0][1]["note"] == self.NON_ASCII
+        assert b"\r\n" not in raw
+
+    def test_guard_is_armed(self, register, tmp_path):
+        """The fix is only real if writing this text through the *locale* encoding
+        would actually have failed — otherwise these assertions prove nothing."""
+        probe = tmp_path / "probe.txt"
+        with pytest.raises(UnicodeEncodeError):
+            probe.write_text(self.NON_ASCII, encoding="cp1252")
 
 
 class TestIdAllocation:
@@ -92,10 +170,10 @@ class TestIdAllocation:
     def test_allocation_after_gaps(self, register):
         (register.register_dir / "R-0002.yaml").write_text(
             RISK_WITH_COMMENTS.replace("R-0001", "R-0002")
-        )
+        , encoding="utf-8")
         (register.register_dir / "R-0007.yaml").write_text(
             RISK_WITH_COMMENTS.replace("R-0001", "R-0007")
-        )
+        , encoding="utf-8")
         assert register.next_risk_id() == "R-0008"
 
 
@@ -121,7 +199,7 @@ class TestEvents:
         assert raw["principal"] == "human:many"
 
     def test_malformed_line_raises_with_location(self, register):
-        register.events_path.write_text('{"ok": 1}\nnot json\n')
+        register.events_path.write_text('{"ok": 1}\nnot json\n', encoding="utf-8")
         with pytest.raises(StoreError, match="events.jsonl:2"):
             register.read_events()
 
@@ -140,7 +218,7 @@ class TestInitDefaults:
             "aspects: [iso25010.typo-aspect]\n"
             "elicited_by: {method: manual, evidence: [x.md]}\n"
             "status: proposed\nmitigations: []\n"
-        )
+        , encoding="utf-8")
         report = validate_register(store)
         assert report.passed
         assert any("typo-aspect" in f.message for f in report.findings)

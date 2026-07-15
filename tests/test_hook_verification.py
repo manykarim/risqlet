@@ -186,7 +186,7 @@ def store_with_secret_risk(tmp_path):
     from risqlet.store import Store, init_register
 
     store = Store(init_register(tmp_path, "demo"))
-    (store.register_dir / "R-0001.yaml").write_text(ACCEPTED_SECRET_RISK)
+    (store.register_dir / "R-0001.yaml").write_text(ACCEPTED_SECRET_RISK, encoding="utf-8")
     return store
 
 
@@ -198,7 +198,7 @@ class TestInstallGate:
         # tools (grep/bash) are present, so the hook verifies and installs for real
         install_plan(store_with_secret_risk, build_plan(store_with_secret_risk),
                      "claude-project", proj)
-        settings = json.loads((proj / ".claude" / "settings.json").read_text())
+        settings = json.loads((proj / ".claude" / "settings.json").read_text(encoding="utf-8"))
         cmds = [h["command"] for e in settings["hooks"]["PostToolUse"] for h in e["hooks"]]
         assert any("grep" in c and "true #" not in c for c in cmds)  # real, not placeholder
         assert not any(c.strip().startswith("true #") for c in cmds)
@@ -215,7 +215,7 @@ class TestInstallGate:
                               "claude-project", proj)
         assert any(s["template_id"] == "secret-scan-posttool" and not s["forced"]
                    for s in result["verify_skipped"])
-        settings = json.loads((proj / ".claude" / "settings.json").read_text())
+        settings = json.loads((proj / ".claude" / "settings.json").read_text(encoding="utf-8"))
         cmds = [h["command"] for e in settings.get("hooks", {}).get("PostToolUse", [])
                 for h in e["hooks"]]
         assert not any("grep" in c for c in cmds)  # the failing hook was not installed
@@ -252,7 +252,7 @@ class TestCoverageStopDetection:
             ACCEPTED_SECRET_RISK.replace("R-0001", "R-0002")
             .replace("[iso25010.confidentiality, iso25010.security]", "[iso25010.testability]")
             .replace("barrier: prevent", "barrier: detect")
-            .replace("owasp-web.cryptographic-failures", "iso25010.testability"))
+            .replace("owasp-web.cryptographic-failures", "iso25010.testability"), encoding="utf-8")
         # tmp_path has no pyproject/package.json/Makefile-test -> parked
         plan = build_plan(store)
         assert not any(g.template_id == "coverage-check-stop" for g in plan.guardrails)
@@ -261,13 +261,13 @@ class TestCoverageStopDetection:
     def test_detects_pytest(self, tmp_path):
         from risqlet.store import Store, init_register
 
-        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
         store = Store(init_register(tmp_path, "demo"))
         (store.register_dir / "R-0002.yaml").write_text(
             ACCEPTED_SECRET_RISK.replace("R-0001", "R-0002")
             .replace("[iso25010.confidentiality, iso25010.security]", "[iso25010.testability]")
             .replace("barrier: prevent", "barrier: detect")
-            .replace("owasp-web.cryptographic-failures", "iso25010.testability"))
+            .replace("owasp-web.cryptographic-failures", "iso25010.testability"), encoding="utf-8")
         plan = build_plan(store)
         g = next((g for g in plan.guardrails if g.template_id == "coverage-check-stop"), None)
         assert g is not None and "pytest -q" in g.command
@@ -286,22 +286,22 @@ class TestInstalledClaudeStdinContract:
         (proj / "src" / "auth").mkdir(parents=True)
         install_plan(store_with_secret_risk, build_plan(store_with_secret_risk),
                      "claude-project", proj)
-        settings = json.loads((proj / ".claude" / "settings.json").read_text())
+        settings = json.loads((proj / ".claude" / "settings.json").read_text(encoding="utf-8"))
         cmd = [h["command"] for e in settings["hooks"]["PostToolUse"]
                for h in e["hooks"]][0]
         target = proj / "src" / "auth" / "fixtures.py"
 
         def run(stdin_json: str) -> int:
             return subprocess.run(["bash", "-c", cmd], input=stdin_json,
-                                  capture_output=True, text=True).returncode
+                                  capture_output=True, text=True, encoding="utf-8").returncode
 
         payload = json.dumps({"tool_name": "Write",
                               "tool_input": {"file_path": str(target)}})
-        target.write_text("port = 8080\n")
+        target.write_text("port = 8080\n", encoding="utf-8")
         assert run(payload) == 0                    # benign: allowed
-        target.write_text("token = 'abc123'\n")
+        target.write_text("token = 'abc123'\n", encoding="utf-8")
         assert run(payload) == 2                    # secret: blocked via stdin JSON
         # a file outside the scoped path is ignored
         outside = proj / "other.py"
-        outside.write_text("token = 'abc123'\n")
+        outside.write_text("token = 'abc123'\n", encoding="utf-8")
         assert run(json.dumps({"tool_input": {"file_path": str(outside)}})) == 0
