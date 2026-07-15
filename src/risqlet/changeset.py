@@ -8,6 +8,7 @@ mutated from CI. Matching reuses the ensemble/trace normalization helpers.
 from __future__ import annotations
 
 import fnmatch
+import json
 import subprocess
 from pathlib import PurePosixPath
 
@@ -22,6 +23,33 @@ CI_MODES = ("off", "warn", "block")
 
 class ChangesetError(Exception):
     pass
+
+
+# Claude Code writes a JSON envelope to a hook's stdin (it sets no env var for the
+# edited path), so the CLI parses it directly rather than making the hook shell out
+# to an interpreter to dig the path out.
+def parse_claude_hook_payload(text: str | None) -> list[str]:
+    """Changed files named by a Claude Code hook payload.
+
+    Total by design: a hook runs inside an agent's edit loop, so an unusable
+    payload yields no files rather than an error. Callers treat [] as "nothing
+    to check" — see the never-fail contract in cmd_check.
+    """
+    if not text or not text.strip():
+        return []
+    try:
+        payload = json.loads(text)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return []
+    path = tool_input.get("file_path")
+    if not isinstance(path, str) or not path.strip():
+        return []
+    return [path.strip()]
 
 
 def changed_files(store_dir, base: str | None, files: list[str] | None,

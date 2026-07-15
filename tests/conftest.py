@@ -1,10 +1,78 @@
 """Shared fixtures: a populated register used across validate/score/export/CLI tests."""
 
 import json
+import os
+import stat
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
 
 import pytest
 
 from risqlet.store import Store, init_register
+
+SRC = str(Path(__file__).resolve().parent.parent / "src")
+
+POSIX_ONLY_REASON = (
+    "risqlet guardrails is POSIX-only: its hook templates are shell one-liners and "
+    "its verifier uses POSIX process handling. This is a stated support boundary, "
+    "not an accident of the runner image — Windows runners do ship Git Bash."
+)
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip POSIX-only tests on Windows, visibly and with a reason.
+
+    A skip shows up in the run; a test omitted from a hand-picked per-OS selection
+    does not, and absence reads as green. Platform gaps belong here, where they are
+    stated, rather than in the workflow's test selection.
+    """
+    if os.name != "nt":
+        return
+    skip = pytest.mark.skip(reason=POSIX_ONLY_REASON)
+    for item in items:
+        if "posix_only" in item.keywords:
+            item.add_marker(skip)
+
+
+def _path_risqlet_runs_hook() -> bool:
+    """Does the `risqlet` on PATH understand the hook command we install?"""
+    try:
+        proc = subprocess.run(["risqlet", "check", "--hook-input", "claude", "--json"],
+                              input="{}", capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
+
+
+@pytest.fixture
+def risqlet_on_path(tmp_path_factory, monkeypatch):
+    """Guarantee the `risqlet` on PATH is this working tree's.
+
+    Hook verification runs the real `risqlet` executable, so an editable install
+    (`uv sync` / `uv run pytest`) already satisfies this. Bare `python -m pytest`
+    may instead resolve a stale global install (e.g. `uv tool install risqlet`),
+    which would let whatever is installed decide the result rather than the code
+    under test — so shim the working tree in front of it.
+    """
+    if _path_risqlet_runs_hook():
+        return  # editable install already on PATH — nothing to do
+    if os.name == "nt":  # subprocess cannot exec a .bat shim via CreateProcess
+        pytest.skip("no working risqlet on PATH — install the package first (uv sync)")
+    shim_dir = tmp_path_factory.mktemp("shim")
+    launcher = shim_dir / "risqlet"
+    launcher.write_text(textwrap.dedent(f"""\
+        #!{sys.executable}
+        import sys
+        sys.path.insert(0, {SRC!r})
+        from risqlet.cli import main
+        sys.exit(main())
+        """))
+    launcher.chmod(launcher.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
+    monkeypatch.setenv("PATH", str(shim_dir) + os.pathsep + os.environ["PATH"])
+    # fail loudly here rather than as a confusing verification skip downstream
+    assert _path_risqlet_runs_hook(), "risqlet shim is broken"
 
 RISK_1 = """\
 schema_version: 1

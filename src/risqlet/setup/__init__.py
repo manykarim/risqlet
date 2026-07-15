@@ -1,8 +1,13 @@
 from risqlet.setup.engine import (
+    DETECT_LABELS,
+    DETECT_PATH,
+    DETECT_PROJECT,
+    DETECT_USER,
     SetupError,
     apply_plan,
     build_plan,
     detect,
+    detect_sources,
     load_adapters,
     read_manifest,
     remove,
@@ -12,6 +17,10 @@ from risqlet.setup.models import ALL_COMPONENTS, Component, Plan, Scope
 
 __all__ = [
     "ALL_COMPONENTS",
+    "DETECT_LABELS",
+    "DETECT_PATH",
+    "DETECT_PROJECT",
+    "DETECT_USER",
     "Component",
     "Plan",
     "Scope",
@@ -19,6 +28,7 @@ __all__ = [
     "apply_plan",
     "build_plan",
     "detect",
+    "detect_sources",
     "load_adapters",
     "read_manifest",
     "remove",

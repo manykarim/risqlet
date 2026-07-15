@@ -42,14 +42,44 @@ def load_adapters() -> dict[str, AgentAdapter]:
     return out
 
 
-def detect(adapters: dict[str, AgentAdapter]) -> list[str]:
-    found = []
+# How an agent was detected. An adapter's unanchored dirs (".claude", ".vscode",
+# ".github") resolve against the *current working directory*, so finding one says
+# the project is set up for that agent — not that the agent is installed on this
+# machine. Only PATH says that. Keeping these apart matters: this repo ships a
+# .claude/ directory, which would otherwise report Claude Code as installed on any
+# machine that checked out the repo.
+DETECT_PATH = "path"        # binary resolved on PATH — the agent is installed
+DETECT_USER = "user"        # a dir under the user's home (~/.codex) — agent configured
+DETECT_PROJECT = "project"  # a dir in the cwd (.claude) — the *project* uses it
+
+DETECT_LABELS = {
+    DETECT_PATH: "found on PATH",
+    DETECT_USER: "configured for you",
+    DETECT_PROJECT: "used by this project",
+}
+
+
+def detect_sources(adapters: dict[str, AgentAdapter]) -> dict[str, str]:
+    """Map each detected agent to *how* it was detected (DETECT_* above)."""
+    found: dict[str, str] = {}
     for aid, ad in adapters.items():
-        binary = bool(ad.detect.binary) and shutil.which(ad.detect.binary) is not None
-        dirs = any(Path(d).expanduser().exists() for d in ad.detect.dirs)
-        if binary or dirs:
-            found.append(aid)
+        if ad.detect.binary and shutil.which(ad.detect.binary) is not None:
+            found[aid] = DETECT_PATH
+            continue
+        for d in ad.detect.dirs:
+            if Path(d).expanduser().exists():
+                found[aid] = DETECT_USER if d.startswith("~") else DETECT_PROJECT
+                break
     return found
+
+
+def detect(adapters: dict[str, AgentAdapter]) -> list[str]:
+    """Agents worth offering to configure, however they were found.
+
+    Use detect_sources() when the distinction matters — presence of a project
+    directory is not evidence the agent is installed.
+    """
+    return list(detect_sources(adapters))
 
 
 def _marker(method: str, key: str) -> str:

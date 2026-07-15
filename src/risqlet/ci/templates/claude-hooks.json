@@ -1,5 +1,5 @@
 {
-  "_comment": "Merge this into your Claude Code settings.json (project .claude/settings.json or ~/.claude/settings.json). After each file write/edit, the risqlet CLI surfaces which tracked risks the change touches. Claude-Code-specific.",
+  "_comment": "Merge this into your Claude Code settings.json (project .claude/settings.json or ~/.claude/settings.json). After each file write/edit, the risqlet CLI surfaces which tracked risks the change touches. Claude Code passes the tool payload as JSON on stdin, which `check --hook-input claude` reads directly — so this needs no shell and works on Linux, macOS, and Windows alike. It reports only and always exits 0; it never blocks an edit. Claude-Code-specific.",
   "hooks": {
     "PostToolUse": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "risqlet check --files \"$CLAUDE_TOOL_FILE_PATH\" --json 2>/dev/null || true"
+            "command": "risqlet check --hook-input claude --json"
           }
         ]
       }
