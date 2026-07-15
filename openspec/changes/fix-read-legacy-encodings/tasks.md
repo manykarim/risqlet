@@ -15,9 +15,13 @@
   this ship again.
 - [x] 2.2 Report the fallback to stderr, once per file, naming the path and that it
   will be rewritten as UTF-8. Silent repair is indistinguishable from the mojibake bug.
-- [x] 2.3 Use it in `src/risqlet/setup/render.py` at every read of a file risqlet
-  merges into: `apply_md_section`, `apply_toml_merge`, `apply_json_merge`,
-  `apply_json_hooks`, and the matching `remove_*` paths.
+- [x] 2.3 Use it in `src/risqlet/setup/render.py` for the markdown reads only —
+  `apply_md_section` and `remove_md_section`. **Corrected during implementation:** as
+  first written this task also listed `apply_toml_merge` / `apply_json_merge` /
+  `apply_json_hooks`, which contradicts 2.5. Checking each surface showed risqlet's
+  own output only ever contained non-ASCII in the markdown section and the YAML
+  (em-dashes in `INSTRUCTIONS_BODY` and `_STARTER_CONFIG`); its JSON and TOML writes
+  are ASCII. So those stay strict, per design decision 3.
 - [x] 2.4 Use it in `src/risqlet/store.py` for `config.yaml` and `register/*.yaml`.
 - [x] 2.5 Do **not** use it for `events.jsonl` or the JSON agent configs — `json.dumps`
   escapes to ASCII, so risqlet never wrote a non-ASCII byte there; a decode error is
