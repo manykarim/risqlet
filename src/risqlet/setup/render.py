@@ -14,6 +14,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from risqlet.textio import read_text_tolerant
+
 MCP_COMMAND = "risqlet"
 MCP_ARGS = ["mcp"]
 
@@ -92,7 +94,10 @@ def apply_md_section(path: Path) -> bool:
     """Returns True if the file was created."""
     section = f"{MD_BEGIN}\n{INSTRUCTIONS_BODY.rstrip()}\n{MD_END}\n"
     created = not path.exists()
-    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    # tolerant: our own section contains an em-dash, so a pre-encoding-fix risqlet on
+    # Windows left this file cp1252 — and a user's editor may have too. Rewritten as
+    # UTF-8 below, so the file heals the first time setup touches it.
+    existing = read_text_tolerant(path) if path.exists() else ""
     if MD_BEGIN in existing and MD_END in existing:
         pre = existing.split(MD_BEGIN)[0]
         post = existing.split(MD_END, 1)[1]
@@ -226,7 +231,7 @@ def remove_toml_merge(path: Path) -> None:
 def remove_md_section(path: Path, created: bool) -> None:
     if not path.exists():
         return
-    new = _strip_block(path.read_text(encoding="utf-8"), MD_BEGIN, MD_END)
+    new = _strip_block(read_text_tolerant(path), MD_BEGIN, MD_END)
     if created and not new.strip():
         path.unlink()
     else:

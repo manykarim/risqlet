@@ -7,6 +7,18 @@ All notable changes to risqlet are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **`risqlet setup` no longer crashes on a `CLAUDE.md` that an older risqlet wrote.**
+  Making reads strict UTF-8 was right for what risqlet writes from now on and wrong
+  for what was already on disk — including files risqlet itself wrote in cp1252
+  before that fix. A Windows user upgrading hit
+  `UnicodeDecodeError: ... byte 0x97 ...` on the em-dash in risqlet's *own*
+  instructions block. This was a regression introduced by the encoding fix, not a
+  pre-existing bug, and it hit exactly the users that fix was for.
+  Reads of markdown instructions files and the register now fall back to cp1252,
+  recover the text intact, report the recovery, and rewrite the file as UTF-8 — so a
+  file heals the first time risqlet touches it. The tolerance is scoped by evidence to
+  where risqlet's own output contained non-ASCII; the JSON and TOML configs stay
+  strict, since risqlet only ever wrote ASCII there and both formats mandate UTF-8.
 - **Text I/O is now explicitly UTF-8 everywhere, fixing silent data corruption on
   Windows.** risqlet read and wrote every file — the register, `config.yaml`,
   catalog packs, agent configs — in Python's *locale* encoding. That is UTF-8 on
