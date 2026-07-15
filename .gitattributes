@@ -1,0 +1,14 @@
+# Keep the working tree byte-identical on every platform.
+#
+# Windows checkouts default to core.autocrlf=true, which rewrites text files to
+# CRLF on checkout. That would mean the YAML fixtures, catalog packs and skill
+# files a Windows contributor reads are not the bytes CI reads — and risqlet
+# writes LF explicitly (newline="\n"), so a CRLF working tree would also show
+# spurious diffs the moment the CLI rewrites a register.
+* text=auto eol=lf
+
+# Never translate binary-ish assets.
+*.png binary
+*.jpg binary
+*.ico binary
+*.whl binary

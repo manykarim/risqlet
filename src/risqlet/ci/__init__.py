@@ -28,7 +28,7 @@ def templates_root() -> Path:
 def template_text(target: str) -> str:
     if target not in TARGETS:
         raise CIError(f"unknown target {target!r}")
-    return (templates_root() / TARGETS[target][0]).read_text()
+    return (templates_root() / TARGETS[target][0]).read_text(encoding="utf-8")
 
 
 def init(target: str, project_dir: Path, explicit_path: Path | None = None,
@@ -56,5 +56,5 @@ def _write(dest: Path, text: str, force: bool) -> dict:
     if dest.exists() and not force:
         raise CIError(f"{dest} already exists (use --force to overwrite)")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(text)
+    dest.write_text(text, encoding="utf-8", newline="\n")
     return {"written": str(dest), "printed": False}

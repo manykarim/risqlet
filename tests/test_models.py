@@ -149,6 +149,6 @@ class TestSchemaGeneration:
         from risqlet.model.schema_gen import SCHEMAS_DIR
 
         for filename, text in generate().items():
-            committed = (SCHEMAS_DIR / filename).read_text()
+            committed = (SCHEMAS_DIR / filename).read_text(encoding="utf-8")
             assert committed == text, \
                 f"{filename} is stale — run python -m risqlet.model.schema_gen"

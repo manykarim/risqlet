@@ -20,8 +20,8 @@ def test_full_workflow(tmp_path, capsys):
 
     # 2. an agent authors two risks (proposed) with scores and one mitigation
     store = Store(tmp_path / ".risqlet")
-    (store.register_dir / "R-0001.yaml").write_text(RISK_1)
-    (store.register_dir / "R-0002.yaml").write_text(RISK_2)
+    (store.register_dir / "R-0001.yaml").write_text(RISK_1, encoding="utf-8")
+    (store.register_dir / "R-0002.yaml").write_text(RISK_2, encoding="utf-8")
 
     # 3. deterministic scoring
     assert main(["score", "--all", "--dir", root, "--json"]) == 0
@@ -45,7 +45,9 @@ def test_full_workflow(tmp_path, capsys):
                      risk="R-0001", principal="human:many",
                      note="confirmed in review", to="reviewed", **{"from": "proposed"})
     path = store.register_dir / "R-0001.yaml"
-    path.write_text(path.read_text().replace("status: proposed", "status: reviewed"))
+    path.write_text(path.read_text(encoding="utf-8").replace("status: proposed",
+                                                             "status: reviewed"),
+                                                             encoding="utf-8")
 
     # 5. the gate command passes with warnings only (R-0002 is speculative)
     assert main(["validate", "--dir", root, "--json"]) == 0
@@ -60,7 +62,7 @@ def test_full_workflow(tmp_path, capsys):
         assert main(["export", "--fmt", fmt, "-o", str(out_dir / name),
                      "--dir", root]) == 0
 
-    strategy = (out_dir / "strategy.md").read_text()
+    strategy = (out_dir / "strategy.md").read_text(encoding="utf-8")
     assert "# Test Strategy: pos-terminal" in strategy
     assert "iso25010.reliability" in strategy
     assert "M-0001" in strategy
@@ -71,6 +73,8 @@ def test_full_workflow(tmp_path, capsys):
                      risk="R-0002", principal="agent:eager-helper",
                      note="", to="reviewed", **{"from": "proposed"})
     path2 = store.register_dir / "R-0002.yaml"
-    path2.write_text(path2.read_text().replace("status: proposed", "status: reviewed"))
+    path2.write_text(path2.read_text(encoding="utf-8").replace("status: proposed",
+                                                               "status: reviewed"),
+                                                               encoding="utf-8")
     assert main(["validate", "--dir", root]) == 1
     assert "human principal" in capsys.readouterr().out

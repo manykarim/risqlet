@@ -149,7 +149,7 @@ def ingest(store: Store, paths: list[Path], ts: str, source_names: list[str] | N
                 "ts": ts, "test_ref": f"{r.suite}::{r.name}", "key": list(key),
                 "outcome": r.outcome, "source": source, "duration": r.duration,
             })
-    with results_path(store).open("a") as f:
+    with results_path(store).open("a", encoding="utf-8", newline="\n") as f:
         for line in lines:
             f.write(json.dumps(line, sort_keys=True) + "\n")
     return {"ingested": len(lines), "per_source": per_file}
@@ -160,7 +160,7 @@ def read_results(store: Store) -> list[dict]:
     if not path.exists():
         return []
     out = []
-    for lineno, line in enumerate(path.read_text().splitlines(), start=1):
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         if not line.strip():
             continue
         try:

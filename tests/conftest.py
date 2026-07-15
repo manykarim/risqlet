@@ -14,6 +14,16 @@ from risqlet.store import Store, init_register
 
 SRC = str(Path(__file__).resolve().parent.parent / "src")
 
+
+def read_utf8(path) -> str:
+    """Read a fixture as UTF-8.
+
+    Tests must not inherit the host's locale encoding either: on Windows that is
+    cp1252, which would mojibake the UTF-8 fixtures and data this repo ships and
+    turn a real assertion into a confusing string mismatch.
+    """
+    return Path(path).read_text(encoding="utf-8")
+
 POSIX_ONLY_REASON = (
     "risqlet guardrails is POSIX-only: its hook templates are shell one-liners and "
     "its verifier uses POSIX process handling. This is a stated support boundary, "
@@ -40,7 +50,8 @@ def _path_risqlet_runs_hook() -> bool:
     """Does the `risqlet` on PATH understand the hook command we install?"""
     try:
         proc = subprocess.run(["risqlet", "check", "--hook-input", "claude", "--json"],
-                              input="{}", capture_output=True, text=True, timeout=60)
+                              input="{}", capture_output=True, text=True,
+                              encoding="utf-8", timeout=60)
     except (OSError, subprocess.SubprocessError):
         return False
     return proc.returncode == 0
@@ -68,7 +79,7 @@ def risqlet_on_path(tmp_path_factory, monkeypatch):
         sys.path.insert(0, {SRC!r})
         from risqlet.cli import main
         sys.exit(main())
-        """))
+        """), encoding="utf-8")
     launcher.chmod(launcher.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
     monkeypatch.setenv("PATH", str(shim_dir) + os.pathsep + os.environ["PATH"])
     # fail loudly here rather than as a confusing verification skip downstream
@@ -126,12 +137,12 @@ mitigations: []
 def populated_register(tmp_path):
     risqlet = init_register(tmp_path, "demo")
     store = Store(risqlet)
-    (store.register_dir / "R-0001.yaml").write_text(RISK_1)
-    (store.register_dir / "R-0002.yaml").write_text(RISK_2)
+    (store.register_dir / "R-0001.yaml").write_text(RISK_1, encoding="utf-8")
+    (store.register_dir / "R-0002.yaml").write_text(RISK_2, encoding="utf-8")
     return store
 
 
 def append_raw_event(store: Store, **kw):
     """Append an event dict without model validation (for negative tests)."""
-    with store.events_path.open("a") as f:
+    with store.events_path.open("a", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(kw) + "\n")

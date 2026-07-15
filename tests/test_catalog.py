@@ -128,7 +128,7 @@ class TestLoader:
             "  - {slug: legacy-check, name: Legacy check, kind: heuristic,\n"
             "     summary: internal wisdom, prompts: ['what about the legacy?'],\n"
             "     provenance: internal}\n"
-        )
+        , encoding="utf-8")
         pack = load_pack("company-v1", store)
         assert pack.entry_ids() == ["company-v1.legacy-check"]
         assert "company-v1" in load_available(store)
@@ -142,7 +142,7 @@ class TestLoader:
             "attribution: internal\nentries:\n"
             "  - {slug: only-ours, name: Only ours, kind: technique,\n"
             "     summary: shadowing, prompts: ['?'], provenance: internal}\n"
-        )
+        , encoding="utf-8")
         pack = load_pack("techniques", store)
         assert pack.title == "Ours"
 
@@ -154,7 +154,7 @@ class TestLoader:
             "id: other\ntitle: t\nlicense: l\nattribution: a\nentries:\n"
             "  - {slug: s, name: n, kind: heuristic, summary: s,\n"
             "     prompts: ['?'], provenance: p}\n"
-        )
+        , encoding="utf-8")
         with pytest.raises(CatalogError, match="does not match"):
             load_pack("alias", store)
 

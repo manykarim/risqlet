@@ -3,7 +3,7 @@
 from risqlet.findings import Severity
 from risqlet.scoring import score_risks
 from risqlet.validate import validate_register
-from tests.conftest import append_raw_event
+from tests.conftest import append_raw_event, read_utf8
 
 
 def errors(report):
@@ -29,9 +29,13 @@ class TestValidatePipeline:
     def test_aggregates_multiple_findings(self, populated_register):
         # schema error in one file + lifecycle violation in another, one run
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace("treatment: reduce", "treatment: wish"))
+        path.write_text(path.read_text(encoding="utf-8").replace("treatment: reduce",
+                                                                 "treatment: wish"),
+                                                                 encoding="utf-8")
         path2 = populated_register.register_dir / "R-0002.yaml"
-        path2.write_text(path2.read_text().replace("status: proposed", "status: accepted"))
+        path2.write_text(path2.read_text(encoding="utf-8").replace("status: proposed",
+                                                                   "status: accepted"),
+                                                                   encoding="utf-8")
         report = validate_register(populated_register)
         assert not report.passed
         messages = [f.message for f in errors(report)]
@@ -41,13 +45,15 @@ class TestValidatePipeline:
 
     def test_dangling_mitigation_reference(self, populated_register):
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace("risk_ids: [R-0001]", "risk_ids: [R-0009]"))
+        path.write_text(path.read_text(encoding="utf-8").replace("risk_ids: [R-0001]",
+                                                                 "risk_ids: [R-0009]"),
+                                                                 encoding="utf-8")
         report = validate_register(populated_register)
         assert any("unknown risk R-0009" in f.message for f in errors(report))
 
     def test_duplicate_risk_id(self, populated_register):
-        dup = (populated_register.register_dir / "R-0002.yaml").read_text()
-        (populated_register.register_dir / "R-0003.yaml").write_text(dup)
+        dup = (populated_register.register_dir / "R-0002.yaml").read_text(encoding="utf-8")
+        (populated_register.register_dir / "R-0003.yaml").write_text(dup, encoding="utf-8")
         report = validate_register(populated_register)
         assert any("duplicate id R-0002" in f.message for f in errors(report))
         assert any("does not match id" in f.message for f in warnings(report))
@@ -55,13 +61,16 @@ class TestValidatePipeline:
     def test_tampered_derived_detected(self, populated_register):
         score_risks(populated_register)
         path = populated_register.register_dir / "R-0002.yaml"
-        path.write_text(path.read_text().replace("action_priority: HIGH", "action_priority: LOW"))
+        path.write_text(path.read_text(encoding="utf-8").replace("action_priority: HIGH",
+                                                                 "action_priority: LOW"),
+                                                                 encoding="utf-8")
         report = validate_register(populated_register)
         assert any("does not match policy computation" in f.message for f in errors(report))
 
     def test_unknown_extra_field_warns(self, populated_register):
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text() + "x_annotation: from-a-future-layer\n")
+        path.write_text(path.read_text(encoding="utf-8") + "x_annotation: from-a-future-layer\n",
+                                       encoding="utf-8")
         report = validate_register(populated_register)
         assert report.passed
         assert any(f.field == "x_annotation" for f in warnings(report))
@@ -69,8 +78,8 @@ class TestValidatePipeline:
     def test_bad_aspect_format(self, populated_register):
         path = populated_register.register_dir / "R-0001.yaml"
         path.write_text(
-            path.read_text().replace("[iso25010.reliability]", "['Reliability!']")
-        )
+            path.read_text(encoding="utf-8").replace("[iso25010.reliability]", "['Reliability!']")
+        , encoding="utf-8")
         report = validate_register(populated_register)
         assert any("namespaced catalog.slug" in f.message for f in errors(report))
 
@@ -81,7 +90,9 @@ class TestValidatePipeline:
             principal="agent:helper", note="", to="reviewed", **{"from": "proposed"},
         )
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace("status: proposed", "status: reviewed"))
+        path.write_text(path.read_text(encoding="utf-8").replace("status: proposed",
+                                                                 "status: reviewed"),
+                                                                 encoding="utf-8")
         report = validate_register(populated_register)
         assert any("human principal" in f.message for f in errors(report))
 
@@ -92,7 +103,9 @@ class TestValidatePipeline:
             principal="human:many", note="workshop", to="reviewed", **{"from": "proposed"},
         )
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace("status: proposed", "status: reviewed"))
+        path.write_text(path.read_text(encoding="utf-8").replace("status: proposed",
+                                                                 "status: reviewed"),
+                                                                 encoding="utf-8")
         assert validate_register(populated_register).passed
 
     def test_aspect_constraint_enforced(self, populated_register):
@@ -118,17 +131,17 @@ class TestScoreOperation:
 
         yaml = YAML(typ="safe")
         path = populated_register.register_dir / "R-0001.yaml"
-        before = yaml.load(path.read_text())
+        before = yaml.load(path.read_text(encoding="utf-8"))
         updated, findings = score_risks(populated_register)
         assert updated == 2 and not findings
-        after = yaml.load(path.read_text())
+        after = yaml.load(path.read_text(encoding="utf-8"))
         assert after["scores"][0].pop("derived") == {"rpn": 280, "action_priority": "HIGH"}
         assert after == before  # semantically nothing but derived changed
 
     def test_single_risk_scoring(self, populated_register):
         updated, findings = score_risks(populated_register, "R-0002")
         assert updated == 1 and not findings
-        assert "derived" not in (populated_register.register_dir / "R-0001.yaml").read_text()
+        assert "derived" not in read_utf8(populated_register.register_dir / "R-0001.yaml")
 
     def test_unknown_risk_id(self, populated_register):
         updated, findings = score_risks(populated_register, "R-9999")
@@ -137,10 +150,10 @@ class TestScoreOperation:
 
     def test_idempotent(self, populated_register):
         score_risks(populated_register)
-        text = (populated_register.register_dir / "R-0001.yaml").read_text()
+        text = (populated_register.register_dir / "R-0001.yaml").read_text(encoding="utf-8")
         updated, _ = score_risks(populated_register)
         assert updated == 0
-        assert (populated_register.register_dir / "R-0001.yaml").read_text() == text
+        assert (populated_register.register_dir / "R-0001.yaml").read_text(encoding="utf-8") == text
 
     def test_validate_after_score_passes(self, populated_register):
         score_risks(populated_register)

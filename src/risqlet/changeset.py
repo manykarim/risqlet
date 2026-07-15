@@ -61,7 +61,7 @@ def changed_files(store_dir, base: str | None, files: list[str] | None,
     ref = base or "HEAD~1"
     result = subprocess.run(
         ["git", "diff", "--name-only", f"{ref}...HEAD"],
-        cwd=store_dir, capture_output=True, text=True,
+        cwd=store_dir, capture_output=True, text=True, encoding="utf-8",
     )
     if result.returncode != 0:
         raise ChangesetError(

@@ -27,8 +27,8 @@ class TestStrategyMd:
     def test_residual_section_without_mitigations(self, populated_register):
         # strip mitigations from R-0001
         path = populated_register.register_dir / "R-0001.yaml"
-        text = path.read_text()
-        path.write_text(text[: text.index("mitigations:")] + "mitigations: []\n")
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text[: text.index("mitigations:")] + "mitigations: []\n", encoding="utf-8")
         md = render_strategy_md(populated_register)
         assert "## What this does not cover" in md
         assert "remains unmitigated residual risk" in md
@@ -45,7 +45,7 @@ class TestStrategyMd:
         for i in range(3, 15):
             (populated_register.register_dir / f"R-{i:04d}.yaml").write_text(
                 RISK_2.replace("R-0002", f"R-{i:04d}")
-            )
+            , encoding="utf-8")
         md = render_strategy_md(populated_register)
         assert "_4 further risk(s) are tracked in the register" in md
 

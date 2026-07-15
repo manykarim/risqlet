@@ -38,7 +38,7 @@ def load_adapters() -> dict[str, AgentAdapter]:
     yaml = YAML(typ="safe")
     out = {}
     for path in sorted(ADAPTERS_DIR.glob("*.yaml")):
-        out[path.stem] = AgentAdapter.model_validate(yaml.load(path.read_text()))
+        out[path.stem] = AgentAdapter.model_validate(yaml.load(path.read_text(encoding="utf-8")))
     return out
 
 
@@ -161,13 +161,14 @@ def read_manifest(scope: str, project_root: Path) -> Manifest:
     path = manifest_path(scope, project_root)
     if not path.exists():
         return Manifest()
-    return Manifest.model_validate_json(path.read_text())
+    return Manifest.model_validate_json(path.read_text(encoding="utf-8"))
 
 
 def write_manifest(scope: str, project_root: Path, manifest: Manifest) -> None:
     path = manifest_path(scope, project_root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(manifest.model_dump(), indent=2) + "\n")
+    path.write_text(json.dumps(manifest.model_dump(), indent=2) + "\n",
+                    encoding="utf-8", newline="\n")
 
 
 def _merge_manifest(existing: Manifest, new_entries: list[ManifestEntry],

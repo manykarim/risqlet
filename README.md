@@ -76,6 +76,13 @@ JSON Schemas for all file types are published in `src/risqlet/schemas/` (generat
 from the models via `python -m risqlet.model.schema_gen`). Unknown extra fields are
 warnings, not errors — the format is open for forward-compatible annotation.
 
+Every file is **UTF-8 with `\n` line endings**, on every platform — risqlet states
+the encoding rather than inheriting the host's locale, so a register written on
+Windows is byte-identical to one written on Linux and survives a round trip through
+either. This is part of the on-disk contract: the register is meant to be diffed,
+reviewed, and merged in git, which only works if the bytes do not depend on who
+wrote them.
+
 Scoring policies are data, not code (`src/risqlet/policies/packs/`): ordinal factors
 plus derived fields via a `product` formula or a top-down first-match lookup table.
 Default is `sod-ap-v1` (Severity×Occurrence×Detection with severity-dominant

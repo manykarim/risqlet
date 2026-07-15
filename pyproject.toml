@@ -70,6 +70,13 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# An omitted `encoding=` is invisible on Linux/macOS (locale is UTF-8) and only
+# corrupts data on Windows (cp1252). Turn Python's own EncodingWarning into an
+# error so any executed call is caught here rather than by a Windows user. Needs
+# PYTHONWARNDEFAULTENCODING=1 in the environment to be emitted at all — set in
+# .github/workflows/test.yml. Complements ruff's PLW1514, which cannot infer the
+# type of a path held on an attribute and so misses store.py entirely.
+filterwarnings = ["error::EncodingWarning"]
 markers = [
     "posix_only: requires POSIX process handling or a shell hook template; risqlet guardrails is not supported on Windows",
     "slow: builds and installs a wheel into a fresh venv",
@@ -78,6 +85,16 @@ markers = [
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+# required by PLW1514 below, which is still a preview rule
+preview = true
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+# ...but scope preview strictly to rules we opt into by name. Without this,
+# `preview = true` also switches on every other preview rule and preview *behaviour*
+# of already-selected rules, which drags in unrelated churn we never asked for.
+explicit-preview-rules = true
+# PLW1514 (unspecified-encoding) is in ruff *preview* and may churn. Accepted
+# knowingly: it is the redundant half of the encoding guard — it catches code the
+# tests never execute, while the EncodingWarning filter above catches what ruff
+# cannot type-infer. If it destabilises, drop it; the runtime guard still holds.
+select = ["E", "F", "I", "UP", "B", "PLW1514"]

@@ -70,28 +70,29 @@ def _strip_jsonc(text: str) -> str:
 def apply_json_merge(path: Path, key: str, jsonc: bool = False) -> None:
     data = {}
     if path.exists():
-        raw = path.read_text()
+        raw = path.read_text(encoding="utf-8")
         data = json.loads(_strip_jsonc(raw) if jsonc else raw) if raw.strip() else {}
     data.setdefault(key, {})["risqlet"] = _mcp_entry(key)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n")
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def apply_toml_merge(path: Path) -> None:
     block = (f"{TOML_BEGIN}\n[mcp_servers.risqlet]\n"
              f'command = "{MCP_COMMAND}"\nargs = {json.dumps(MCP_ARGS)}\n{TOML_END}\n')
-    existing = path.read_text() if path.exists() else ""
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
     if TOML_BEGIN in existing:
         existing = _strip_block(existing, TOML_BEGIN, TOML_END)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(existing.rstrip("\n") + ("\n\n" if existing.strip() else "") + block)
+    path.write_text(existing.rstrip("\n") + ("\n\n" if existing.strip() else "") + block,
+                    encoding="utf-8", newline="\n")
 
 
 def apply_md_section(path: Path) -> bool:
     """Returns True if the file was created."""
     section = f"{MD_BEGIN}\n{INSTRUCTIONS_BODY.rstrip()}\n{MD_END}\n"
     created = not path.exists()
-    existing = path.read_text() if path.exists() else ""
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
     if MD_BEGIN in existing and MD_END in existing:
         pre = existing.split(MD_BEGIN)[0]
         post = existing.split(MD_END, 1)[1]
@@ -101,7 +102,7 @@ def apply_md_section(path: Path) -> bool:
     else:
         new = section
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(new)
+    path.write_text(new, encoding="utf-8", newline="\n")
     return created
 
 
@@ -109,7 +110,7 @@ def apply_copy_commands(target_dir: Path) -> list[Path]:
     target_dir.mkdir(parents=True, exist_ok=True)
     written = []
     for name, body in COMMAND_FILES.items():
-        (target_dir / name).write_text(body)
+        (target_dir / name).write_text(body, encoding="utf-8", newline="\n")
         written.append(target_dir / name)
     return written
 
@@ -145,7 +146,8 @@ def verify_setup_hook() -> list[str]:
         return fails
     try:
         proc = subprocess.run(shlex.split(SETUP_HOOK_COMMAND), input=_VERIFY_PAYLOAD,
-                              capture_output=True, text=True, timeout=VERIFY_TIMEOUT_S)
+                              capture_output=True, text=True, encoding="utf-8",
+                              timeout=VERIFY_TIMEOUT_S)
     except subprocess.TimeoutExpired:
         fails.append(f"hook did not finish within {VERIFY_TIMEOUT_S}s")
     except OSError as exc:
@@ -164,7 +166,8 @@ def _is_risqlet_hook(hook: dict) -> bool:
 
 
 def apply_json_hooks(path: Path) -> None:
-    data = json.loads(path.read_text()) if path.exists() and path.read_text().strip() else {}
+    raw = path.read_text(encoding="utf-8") if path.exists() else ""
+    data = json.loads(raw) if raw.strip() else {}
     hooks = data.setdefault("hooks", {})
     post = hooks.setdefault("PostToolUse", [])
     # drop any hook of ours first (including a pre-rewrite shell one), so an
@@ -173,7 +176,7 @@ def apply_json_hooks(path: Path) -> None:
     post.append({"matcher": "Write|Edit", "hooks": [{
         "type": "command", "command": SETUP_HOOK_COMMAND}]})
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n")
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def _drop_risqlet_hooks(entries: list) -> None:
@@ -196,7 +199,7 @@ def _strip_block(text: str, begin: str, end: str) -> str:
 def remove_json_merge(path: Path, key: str, jsonc: bool = False) -> None:
     if not path.exists():
         return
-    raw = path.read_text()
+    raw = path.read_text(encoding="utf-8")
     if not raw.strip():
         return
     data = json.loads(_strip_jsonc(raw) if jsonc else raw)
@@ -205,7 +208,7 @@ def remove_json_merge(path: Path, key: str, jsonc: bool = False) -> None:
         if not data[key]:
             del data[key]
     if data:
-        path.write_text(json.dumps(data, indent=2) + "\n")
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
     else:
         path.unlink()
 
@@ -213,9 +216,9 @@ def remove_json_merge(path: Path, key: str, jsonc: bool = False) -> None:
 def remove_toml_merge(path: Path) -> None:
     if not path.exists():
         return
-    new = _strip_block(path.read_text(), TOML_BEGIN, TOML_END)
+    new = _strip_block(path.read_text(encoding="utf-8"), TOML_BEGIN, TOML_END)
     if new.strip():
-        path.write_text(new)
+        path.write_text(new, encoding="utf-8", newline="\n")
     else:
         path.unlink()
 
@@ -223,17 +226,17 @@ def remove_toml_merge(path: Path) -> None:
 def remove_md_section(path: Path, created: bool) -> None:
     if not path.exists():
         return
-    new = _strip_block(path.read_text(), MD_BEGIN, MD_END)
+    new = _strip_block(path.read_text(encoding="utf-8"), MD_BEGIN, MD_END)
     if created and not new.strip():
         path.unlink()
     else:
-        path.write_text(new)
+        path.write_text(new, encoding="utf-8", newline="\n")
 
 
 def remove_json_hooks(path: Path) -> None:
-    if not path.exists() or not path.read_text().strip():
+    if not path.exists() or not path.read_text(encoding="utf-8").strip():
         return
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     hooks = data.get("hooks", {})
     for event in list(hooks):
         _drop_risqlet_hooks(hooks[event])
@@ -242,6 +245,6 @@ def remove_json_hooks(path: Path) -> None:
     if not hooks:
         data.pop("hooks", None)
     if data:
-        path.write_text(json.dumps(data, indent=2) + "\n")
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
     else:
         path.unlink()

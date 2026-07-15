@@ -8,6 +8,7 @@ import pytest
 from risqlet.catalog import load_pack, packaged_pack_ids, resolve_entry
 from risqlet.cli import build_parser, main
 from risqlet.skills import SkillsError, install, list_skills, skills_root
+from tests.conftest import read_utf8
 
 CATALOG_ID_RE = re.compile(
     r"\b(?:iso25010|techniques|heuristics|guidewords|mitre-attack|owasp-web)"
@@ -34,14 +35,14 @@ class TestDriftGuards:
 
     def test_skill_md_line_budgets(self):
         for skill in list_skills():
-            lines = (skill.path / "SKILL.md").read_text().count("\n")
+            lines = (skill.path / "SKILL.md").read_text(encoding="utf-8").count("\n")
             assert lines <= LINE_BUDGETS[skill.name], \
                 f"{skill.name}/SKILL.md has {lines} lines (budget {LINE_BUDGETS[skill.name]})"
 
     def test_all_catalog_ids_resolve(self):
         packs = {pid: load_pack(pid) for pid in packaged_pack_ids()}
         for md in all_skill_markdown():
-            for entry_id in set(CATALOG_ID_RE.findall(md.read_text())):
+            for entry_id in set(CATALOG_ID_RE.findall(md.read_text(encoding="utf-8"))):
                 assert resolve_entry(entry_id, packs) is not None, \
                     f"{md}: unresolvable catalog id {entry_id}"
 
@@ -51,22 +52,22 @@ class TestDriftGuards:
         for action in parser._subparsers._group_actions:  # noqa: SLF001
             subcommands.update(action.choices.keys())
         for md in all_skill_markdown():
-            for command in set(RISQLET_CMD_RE.findall(md.read_text())):
+            for command in set(RISQLET_CMD_RE.findall(md.read_text(encoding="utf-8"))):
                 assert command in subcommands, f"{md}: unknown command 'risqlet {command}'"
 
     def test_phase_and_gate_coverage(self):
-        text = (skills_root() / "risk-analysis" / "SKILL.md").read_text()
-        text += (skills_root() / "risk-analysis" / "references" / "phases.md").read_text()
+        text = (skills_root() / "risk-analysis" / "SKILL.md").read_text(encoding="utf-8")
+        text += read_utf8(skills_root() / "risk-analysis" / "references" / "phases.md")
         for phase in ["CONTEXT", "ASPECTS", "ELICIT", "SCORE", "MITIGATE", "EMIT"]:
             assert phase in text
         assert text.lower().count("human gate") + text.lower().count("exit gate") >= 3
 
     def test_elicitation_has_five_passes(self):
-        text = (skills_root() / "risk-analysis" / "references" / "elicitation.md").read_text()
+        text = read_utf8(skills_root() / "risk-analysis" / "references" / "elicitation.md")
         assert len(re.findall(r"^## Pass [A-E]", text, flags=re.M)) == 5
 
     def test_quickscan_constraints_stated(self):
-        text = " ".join((skills_root() / "risk-quickscan" / "SKILL.md").read_text().split())
+        text = " ".join(read_utf8(skills_root() / "risk-quickscan" / "SKILL.md").split())
         assert "never advance workflow phase or risk status" in text
         assert "3 or more" in text or "**3 or more**" in text
         assert "severity 9" in text
@@ -111,8 +112,8 @@ class TestSkillsCli:
 
 class TestResumeProtocol:
     def test_status_first_resume(self):
-        skill = (skills_root() / "risk-analysis" / "SKILL.md").read_text()
-        phases = (skills_root() / "risk-analysis" / "references" / "phases.md").read_text()
+        skill = (skills_root() / "risk-analysis" / "SKILL.md").read_text(encoding="utf-8")
+        phases = read_utf8(skills_root() / "risk-analysis" / "references" / "phases.md")
         assert "risqlet status" in skill
         assert "Resuming a session" in phases
         assert "Recorded decisions stand" in phases
@@ -120,23 +121,23 @@ class TestResumeProtocol:
 
 class TestTraceGuidance:
     def test_trace_reference_present(self):
-        text = (skills_root() / "risk-analysis" / "references" / "trace.md").read_text()
+        text = read_utf8(skills_root() / "risk-analysis" / "references" / "trace.md")
         assert "charter:" in text and "risqlet trace ingest" in text
         assert "detection" in text.lower()
 
 
 class TestContinuousGuidance:
     def test_continuous_reference_present(self):
-        text = (skills_root() / "risk-analysis" / "references" / "continuous.md").read_text()
+        text = read_utf8(skills_root() / "risk-analysis" / "references" / "continuous.md")
         assert "risqlet diff" in text and "risqlet check" in text
         assert "ci_gate" in text
-        quickscan = (skills_root() / "risk-quickscan" / "SKILL.md").read_text()
+        quickscan = (skills_root() / "risk-quickscan" / "SKILL.md").read_text(encoding="utf-8")
         assert "risqlet diff" in quickscan
 
 
 class TestGuardrailsGuidance:
     def test_guardrails_reference_and_subcommand(self):
-        text = (skills_root() / "risk-analysis" / "references" / "guardrails.md").read_text()
+        text = read_utf8(skills_root() / "risk-analysis" / "references" / "guardrails.md")
         assert "risqlet guardrails" in text and "barrier" in text.lower()
         assert "hard" in text.lower() and "soft" in text.lower()
         parser = build_parser()

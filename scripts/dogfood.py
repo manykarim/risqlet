@@ -135,7 +135,7 @@ def cmd_run(args) -> int:
 def _load_yaml(path: Path):
     from ruamel.yaml import YAML
 
-    with path.open() as f:
+    with path.open(encoding="utf-8") as f:
         return YAML(typ="safe").load(f)
 
 

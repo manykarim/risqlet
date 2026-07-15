@@ -43,7 +43,7 @@ def load_pack(pack_id: str, store: Store | None = None) -> CatalogPack:
     yaml = YAML(typ="safe")
     for path in candidates:
         if path.is_file():
-            with path.open() as f:
+            with path.open(encoding="utf-8") as f:
                 data = yaml.load(f)
             try:
                 pack = CatalogPack.model_validate(data)

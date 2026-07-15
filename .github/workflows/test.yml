@@ -41,8 +41,16 @@ jobs:
       - run: uv sync
 
       # -rs reports skips with their reasons, so an unsupported component is
-      # visible in the log rather than passing silently
+      # visible in the log rather than passing silently.
+      #
+      # PYTHONWARNDEFAULTENCODING makes Python emit EncodingWarning wherever a text
+      # call omits `encoding=`; pyproject turns that warning into an error. This is
+      # the half of the encoding guard that ruff cannot provide — PLW1514 cannot
+      # infer the type of a path held on an attribute, so it is blind to store.py.
+      # Without this, an unencoded read only misbehaves on Windows, at a user.
       - name: Test
+        env:
+          PYTHONWARNDEFAULTENCODING: "1"
         run: uv run pytest -q -rs
 
   lint:

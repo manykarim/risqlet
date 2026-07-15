@@ -58,8 +58,8 @@ class TestValidateCatalogIntegration:
     def test_unknown_slug_in_loaded_catalog_warns(self, populated_register):
         self._enable_catalogs(populated_register, ["iso25010"])
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace(
-            "[iso25010.reliability]", "[iso25010.typo-aspect]"))
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            "[iso25010.reliability]", "[iso25010.typo-aspect]"), encoding="utf-8")
         report = validate_register(populated_register)
         assert report.passed  # warning, not error
         assert any("typo-aspect" in f.message for f in report.findings
@@ -73,8 +73,8 @@ class TestValidateCatalogIntegration:
 
     def test_unloaded_namespace_unchanged(self, populated_register):
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace(
-            "[iso25010.reliability]", "[companyx.internal-aspect]"))
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            "[iso25010.reliability]", "[companyx.internal-aspect]"), encoding="utf-8")
         report = validate_register(populated_register)
         assert report.passed
         assert not any("companyx" in f.message for f in report.findings)
@@ -82,8 +82,8 @@ class TestValidateCatalogIntegration:
     def test_technique_ref_soft_checked(self, populated_register):
         self._enable_catalogs(populated_register, ["techniques"])
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace(
-            'technique_ref: ""', "technique_ref: techniques.nope-technique"))
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            'technique_ref: ""', "technique_ref: techniques.nope-technique"), encoding="utf-8")
         report = validate_register(populated_register)
         assert report.passed
         assert any("nope-technique" in f.message for f in report.findings
@@ -101,9 +101,9 @@ class TestGuidewordSuffixRefs:
     def test_valid_word_suffix_silent(self, populated_register):
         self._enable(populated_register, ["guidewords"])
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace(
+        path.write_text(path.read_text(encoding="utf-8").replace(
             'prompt_ref: "guideword:LATE"',
-            "prompt_ref: guidewords.flow-deviations:late"))
+            "prompt_ref: guidewords.flow-deviations:late"), encoding="utf-8")
         report = validate_register(populated_register)
         assert report.passed
         assert not any("flow-deviations" in f.message for f in report.findings)
@@ -111,9 +111,9 @@ class TestGuidewordSuffixRefs:
     def test_unknown_word_suffix_warns(self, populated_register):
         self._enable(populated_register, ["guidewords"])
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace(
+        path.write_text(path.read_text(encoding="utf-8").replace(
             'prompt_ref: "guideword:LATE"',
-            "prompt_ref: guidewords.flow-deviations:sideways"))
+            "prompt_ref: guidewords.flow-deviations:sideways"), encoding="utf-8")
         report = validate_register(populated_register)
         assert report.passed
         assert any("'sideways' is not a word" in f.message for f in report.findings)
@@ -121,9 +121,9 @@ class TestGuidewordSuffixRefs:
     def test_unknown_slug_with_suffix_warns(self, populated_register):
         self._enable(populated_register, ["guidewords"])
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace(
+        path.write_text(path.read_text(encoding="utf-8").replace(
             'prompt_ref: "guideword:LATE"',
-            "prompt_ref: guidewords.nope-set:late"))
+            "prompt_ref: guidewords.nope-set:late"), encoding="utf-8")
         report = validate_register(populated_register)
         assert report.passed
         assert any("no entry 'nope-set'" in f.message for f in report.findings)

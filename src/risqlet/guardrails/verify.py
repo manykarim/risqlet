@@ -101,6 +101,7 @@ def _run(command: str, cwd: Path, env_file: Path | None) -> tuple[int, str]:
         proc = subprocess.Popen(
             argv, cwd=cwd, env=env,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            encoding="utf-8", errors="replace",
             start_new_session=True)
         try:
             out, _ = proc.communicate(timeout=TIMEOUT_S)
@@ -186,13 +187,13 @@ def verify_guardrail(guardrail: RenderedGuardrail, cwd: Path) -> VerifyResult:
         scratch = Path(tmp)
         if spec.input == "file":
             fx = _fixture_path(scratch, guardrail, spec)
-            fx.write_text(spec.benign)
+            fx.write_text(spec.benign, encoding="utf-8", newline="\n")
             rc, out = _run(guardrail.command, scratch, fx)
             result.checks.append(Check(
                 "benign-passes", rc == 0,
                 "" if rc == 0 else f"benign fixture blocked (exit {rc}): {out.strip()[:120]}"))
             if spec.blocking:
-                fx.write_text(spec.violation)
+                fx.write_text(spec.violation, encoding="utf-8", newline="\n")
                 rc, out = _run(guardrail.command, scratch, fx)
                 result.checks.append(Check(
                     "violation-caught", rc != 0 and rc != 124,

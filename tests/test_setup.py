@@ -66,7 +66,7 @@ def isolated_env(tmp_path, monkeypatch):
 def _fake_binary(bin_dir, name):
     """An executable `name` that shutil.which will resolve on this platform."""
     exe = bin_dir / (f"{name}.bat" if os.name == "nt" else name)
-    exe.write_text("@echo off\r\n" if os.name == "nt" else "#!/bin/sh\n")
+    exe.write_text("@echo off\r\n" if os.name == "nt" else "#!/bin/sh\n", encoding="utf-8")
     exe.chmod(exe.stat().st_mode | stat.S_IXUSR)
     return exe
 
@@ -147,41 +147,41 @@ class TestMcpRender:
 
     def test_claude_mcpservers(self, tmp_path):
         self._apply(tmp_path, "claude")
-        data = json.loads((tmp_path / ".mcp.json").read_text())
+        data = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
         assert data["mcpServers"]["risqlet"] == {"command": "risqlet", "args": ["mcp"]}
 
     def test_copilot_servers_key(self, tmp_path):
         self._apply(tmp_path, "copilot")
-        data = json.loads((tmp_path / ".vscode/mcp.json").read_text())
+        data = json.loads((tmp_path / ".vscode/mcp.json").read_text(encoding="utf-8"))
         assert "risqlet" in data["servers"]
 
     def test_opencode_local_shape(self, tmp_path):
         self._apply(tmp_path, "opencode")
-        data = json.loads((tmp_path / "opencode.jsonc").read_text())
+        data = json.loads((tmp_path / "opencode.jsonc").read_text(encoding="utf-8"))
         assert data["mcp"]["risqlet"]["type"] == "local"
         assert data["mcp"]["risqlet"]["command"] == ["risqlet", "mcp"]
 
     def test_foreign_mcp_entry_preserved(self, tmp_path):
         (tmp_path / ".mcp.json").write_text(json.dumps(
-            {"mcpServers": {"other": {"command": "x"}}}))
+            {"mcpServers": {"other": {"command": "x"}}}), encoding="utf-8")
         self._apply(tmp_path, "claude")
-        data = json.loads((tmp_path / ".mcp.json").read_text())
+        data = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
         assert "other" in data["mcpServers"] and "risqlet" in data["mcpServers"]
 
 
 class TestInstructions:
     def test_md_section_preserves_user_content(self, tmp_path):
-        (tmp_path / "AGENTS.md").write_text("# My rules\n\nBe careful.\n")
+        (tmp_path / "AGENTS.md").write_text("# My rules\n\nBe careful.\n", encoding="utf-8")
         plan = build_plan(ADAPTERS, ["opencode"], "project", ["instructions"], tmp_path)
         apply_plan(plan, tmp_path)
-        text = (tmp_path / "AGENTS.md").read_text()
+        text = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
         assert "# My rules" in text and "risqlet:setup:begin" in text
 
     def test_reapply_idempotent(self, tmp_path):
         for _ in range(2):
             plan = build_plan(ADAPTERS, ["opencode"], "project", ["instructions"], tmp_path)
             apply_plan(plan, tmp_path)
-        text = (tmp_path / "AGENTS.md").read_text()
+        text = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
         assert text.count("risqlet:setup:begin") == 1
 
 
@@ -197,19 +197,19 @@ class TestApplyRemove:
         assert leftovers == []
 
     def test_removal_preserves_foreign_content(self, tmp_path):
-        (tmp_path / "AGENTS.md").write_text("# Keep me\n")
+        (tmp_path / "AGENTS.md").write_text("# Keep me\n", encoding="utf-8")
         plan = build_plan(ADAPTERS, ["pi"], "project", ["instructions"], tmp_path)
         apply_plan(plan, tmp_path)
         remove("project", tmp_path)
-        assert "# Keep me" in (tmp_path / "AGENTS.md").read_text()
-        assert "risqlet:setup" not in (tmp_path / "AGENTS.md").read_text()
+        assert "# Keep me" in (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+        assert "risqlet:setup" not in (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
 
     def test_shared_mcp_refcount(self, tmp_path):
         # claude + pi share .mcp.json; removing only pi keeps the entry for claude
         plan = build_plan(ADAPTERS, ["claude", "pi"], "project", ["mcp"], tmp_path)
         apply_plan(plan, tmp_path)
         remove("project", tmp_path, ["pi"])
-        data = json.loads((tmp_path / ".mcp.json").read_text())
+        data = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
         assert "risqlet" in data["mcpServers"]  # still needed by claude
         remove("project", tmp_path, ["claude"])
         assert not (tmp_path / ".mcp.json").exists()  # now nobody needs it
@@ -280,12 +280,12 @@ def _settings_with_legacy_hook(project):
         dict(USER_HOOK),
         {"matcher": "Write|Edit", "hooks": [
             {"type": "command", "command": LEGACY_HOOK_COMMAND}]},
-    ]}}, indent=2))
+    ]}}, indent=2), encoding="utf-8")
     return path
 
 
 def _hook_commands(path):
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     return [h["command"] for e in data.get("hooks", {}).get("PostToolUse", [])
             for h in e["hooks"]]
 
@@ -327,7 +327,7 @@ class TestHookIsPlatformIndependent:
                    tmp_path)
         cmd = _hook_commands(tmp_path / ".claude" / "settings.json")[0]
         proc = subprocess.run(shlex.split(cmd), input='{"tool_input": {"file_path": ""}}',
-                              capture_output=True, text=True, timeout=30)
+                              capture_output=True, text=True, encoding="utf-8", timeout=30)
         assert proc.returncode == 0, proc.stderr
 
     def test_verify_passes_without_bash(self, monkeypatch, risqlet_on_path):
@@ -398,7 +398,7 @@ class TestLegacyHookMigration:
             dict(USER_HOOK),
             {"matcher": "Write|Edit", "hooks": [
                 {"type": "command", "command": LEGACY_HOOK_COMMAND}]},
-        ]}}, indent=2))
+        ]}}, indent=2), encoding="utf-8")
         remove("project", tmp_path, ["claude"])
         cmds = _hook_commands(path)
         assert not any("risqlet" in c for c in cmds)  # legacy hook removed, not orphaned

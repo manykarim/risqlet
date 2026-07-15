@@ -11,6 +11,7 @@ from risqlet.ci import CIError, init, template_text
 from risqlet.cli import build_parser, main
 from risqlet.store import Store, init_register
 from risqlet.validate import validate_register
+from tests.conftest import read_utf8
 
 RISK = """\
 schema_version: 1
@@ -30,7 +31,7 @@ def write_risk(store, id, statement="Because the order flow reverts without "
                scores="[]", status="proposed", mitigations="[]"):
     (store.register_dir / f"{id}.yaml").write_text(RISK.format(
         id=id, statement=statement, aspect=aspect, evidence=evidence,
-        scores=scores, status=status, mitigations=mitigations))
+        scores=scores, status=status, mitigations=mitigations), encoding="utf-8")
 
 
 SCORED = """
@@ -91,9 +92,9 @@ class TestDiff:
 
     def test_read_only(self, store):
         write_risk(store, "R-0001")
-        before = {p.name: p.read_text() for p in store.register_dir.iterdir()}
+        before = {p.name: p.read_text(encoding="utf-8") for p in store.register_dir.iterdir()}
         build_diff(store, files=["src/orders/saga.py"])
-        assert {p.name: p.read_text() for p in store.register_dir.iterdir()} == before
+        assert {p.name: read_utf8(p) for p in store.register_dir.iterdir()} == before
 
     def test_files_via_stdin(self, store):
         write_risk(store, "R-0001", evidence='"src/orders/saga.py"')
@@ -153,7 +154,7 @@ class TestCheckGate:
                    'tests: ["pytest:tests/test_saga.py::test_ok"]}]')
         junit = tmp_path / "j.xml"
         junit.write_text('<testsuite><testcase classname="tests.test_saga" '
-                         'name="test_ok"/></testsuite>')
+                         'name="test_ok"/></testsuite>', encoding="utf-8")
         ingest(store, [junit], ts="t")
         self._set_mode(store, "block")
         report = run_check(store, files=["src/orders/saga.py"])
@@ -252,7 +253,7 @@ class TestCiInit:
         result = init("github", tmp_path)
         dest = tmp_path / ".github/workflows/risqlet.yml"
         assert dest.exists() and result["written"] == str(dest)
-        assert "risqlet validate" in dest.read_text() and "risqlet check" in dest.read_text()
+        assert "risqlet validate" in read_utf8(dest) and "risqlet check" in read_utf8(dest)
 
     def test_gitlab(self, tmp_path):
         init("gitlab", tmp_path)

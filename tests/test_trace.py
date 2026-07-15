@@ -46,7 +46,7 @@ def store(tmp_path):
 
 def write_report(tmp_path, name, content):
     p = tmp_path / name
-    p.write_text(content)
+    p.write_text(content, encoding="utf-8")
     return p
 
 
@@ -155,7 +155,7 @@ mitigations:
 class TestDetectionEvidence:
     def test_failing_detection_flagged(self, store, tmp_path):
         (store.register_dir / "R-0007.yaml").write_text(
-            RISK_WITH_DETECTION.format(test="pytest:tests/test_pay.py::test_bad"))
+            RISK_WITH_DETECTION.format(test="pytest:tests/test_pay.py::test_bad"), encoding="utf-8")
         ingest(store, [write_report(tmp_path, "j.xml", JUNIT_XML)], ts="t")
         report = trace_report(store)
         assert report["detection_notes"]
@@ -164,19 +164,19 @@ class TestDetectionEvidence:
 
     def test_charter_detection_flagged(self, store, tmp_path):
         (store.register_dir / "R-0007.yaml").write_text(
-            RISK_WITH_DETECTION.format(test="charter:write the alert test"))
+            RISK_WITH_DETECTION.format(test="charter:write the alert test"), encoding="utf-8")
         report = trace_report(store)
         assert any("not earned" in n for n in report["detection_notes"])
 
     def test_passing_detection_not_flagged(self, store, tmp_path):
         (store.register_dir / "R-0007.yaml").write_text(
-            RISK_WITH_DETECTION.format(test="pytest:tests/test_pay.py::test_ok"))
+            RISK_WITH_DETECTION.format(test="pytest:tests/test_pay.py::test_ok"), encoding="utf-8")
         ingest(store, [write_report(tmp_path, "j.xml", JUNIT_XML)], ts="t")
         assert trace_report(store)["detection_notes"] == []
 
     def test_rollup_and_failing_risks(self, store, tmp_path):
         (store.register_dir / "R-0007.yaml").write_text(
-            RISK_WITH_DETECTION.format(test="pytest:tests/test_pay.py::test_bad"))
+            RISK_WITH_DETECTION.format(test="pytest:tests/test_pay.py::test_bad"), encoding="utf-8")
         ingest(store, [write_report(tmp_path, "j.xml", JUNIT_XML)], ts="t")
         report = trace_report(store)
         assert report["failing_risks"] == ["R-0007"]
@@ -194,11 +194,11 @@ class TestIntegration:
 
         # accept R-0001 and point its mitigation at a failing test
         path = populated_register.register_dir / "R-0001.yaml"
-        text = path.read_text().replace("status: proposed", "status: accepted")
+        text = path.read_text(encoding="utf-8").replace("status: proposed", "status: accepted")
         text = text.replace(
             'tests: ["rf:suites/reconciliation.robot::Nightly Settlement Match"]',
             'tests: ["pytest:tests/test_pay.py::test_bad"]')
-        path.write_text(text)
+        path.write_text(text, encoding="utf-8")
         ingest(populated_register, [write_report(tmp_path, "j.xml", JUNIT_XML)], ts="t")
         report = build_status(populated_register)
         assert any("failing mitigation tests" in h and "R-0001" in h
@@ -208,9 +208,9 @@ class TestIntegration:
         from risqlet.exports.renderers import render_strategy_md
 
         path = populated_register.register_dir / "R-0001.yaml"
-        path.write_text(path.read_text().replace(
+        path.write_text(path.read_text(encoding="utf-8").replace(
             'tests: ["rf:suites/reconciliation.robot::Nightly Settlement Match"]',
-            'tests: ["pytest:tests/test_pay.py::test_bad"]'))
+            'tests: ["pytest:tests/test_pay.py::test_bad"]'), encoding="utf-8")
         ingest(populated_register, [write_report(tmp_path, "j.xml", JUNIT_XML)], ts="t")
         md = render_strategy_md(populated_register)
         assert "### Mitigations with failing or missing tests" in md

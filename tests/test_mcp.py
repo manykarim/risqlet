@@ -4,6 +4,7 @@ import pytest
 
 from risqlet.mcp import tools as t
 from risqlet.skills import skills_root
+from tests.conftest import read_utf8
 
 
 @pytest.fixture
@@ -77,7 +78,7 @@ class TestCatalogAndGuidance:
 
     def test_guidance_parity_with_skills(self):
         result = t.tool_get_guidance("phases")
-        expected = (skills_root() / "risk-analysis/references/phases.md").read_text()
+        expected = read_utf8(skills_root() / "risk-analysis/references/phases.md")
         assert result["content"] == expected
 
     def test_guidance_unknown_topic(self):

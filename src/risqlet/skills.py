@@ -37,7 +37,7 @@ class SkillInfo:
 
 
 def _parse_frontmatter(skill_md: Path) -> dict:
-    text = skill_md.read_text()
+    text = skill_md.read_text(encoding="utf-8")
     if not text.startswith("---"):
         raise SkillsError(f"{skill_md}: missing YAML frontmatter")
     try:
