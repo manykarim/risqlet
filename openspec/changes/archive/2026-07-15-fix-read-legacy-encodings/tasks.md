@@ -62,6 +62,6 @@
 - [x] 6.1 The reproduction from 1.1 passes with the fix and fails without it.
 - [x] 6.2 Full suite + lint green on Linux, both encoding guards still armed.
 - [x] 6.3 `openspec validate fix-read-legacy-encodings --strict`.
-- [ ] 6.4 Push; all three matrix legs green. Windows is the one that counts.
+- [x] 6.4 Push; all three matrix legs green. Windows is the one that counts.
 - [x] 6.5 Reproduce the user's exact invocation end-to-end (`setup` over a cp1252
   `CLAUDE.md`) and confirm it now completes.

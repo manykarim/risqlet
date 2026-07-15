@@ -108,6 +108,19 @@ Text writes SHALL use `\n` line endings on every platform. Python's text mode
 translates `\n` to `\r\n` on Windows, which would make otherwise-deterministic
 output differ by host.
 
+Reading SHALL tolerate a file that is not valid UTF-8 rather than failing the
+command, because risqlet itself produced such files: versions before the encoding fix
+wrote the register in the host locale, so a Windows register containing an em-dash is
+cp1252 on disk. A file that does not decode as UTF-8 SHALL be decoded as cp1252, its
+text recovered intact, and the recovery SHALL be reported rather than performed
+silently. The next write SHALL normalize the file to UTF-8, so a file is repaired by
+being used rather than by a migration step.
+
+The fallback SHALL be a fixed encoding, not the host's locale, so that behaviour and
+tests are identical on every platform. It SHALL NOT apply to files risqlet has only
+ever written as ASCII (`events.jsonl`, whose JSON escapes non-ASCII): there, a decode
+error indicates real corruption and SHALL still be raised.
+
 #### Scenario: Non-ASCII risk round-trips
 - **WHEN** a risk whose statement contains `→`, an em-dash, and CJK is saved and
   read back
@@ -126,4 +139,14 @@ output differ by host.
 #### Scenario: Line endings do not depend on the host
 - **WHEN** the same register is written on Windows and on Linux
 - **THEN** the files are byte-identical, using `\n` in both
+
+#### Scenario: A register an older version wrote in cp1252 still loads
+- **WHEN** a register file containing a cp1252-encoded em-dash — as a pre-fix risqlet
+  on Windows wrote it — is read
+- **THEN** the text is recovered intact, the recovery is reported, and the command
+  succeeds instead of raising `UnicodeDecodeError`
+
+#### Scenario: A recovered file is normalized on write
+- **WHEN** a file recovered from cp1252 is subsequently written
+- **THEN** it is written as UTF-8, so the file stops being non-UTF-8 once used
 
