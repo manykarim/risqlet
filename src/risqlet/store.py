@@ -14,6 +14,7 @@ from pathlib import Path
 from ruamel.yaml import YAML
 
 from risqlet.model import RISK_ID_PATTERN, Event  # noqa: F401  (pattern re-exported for callers)
+from risqlet.textio import read_text_tolerant
 
 RISQLET_DIR = ".risqlet"
 REGISTER_DIR = "register"
@@ -109,8 +110,9 @@ class Store:
         return self.root / CONFIG_FILE
 
     def load_config_raw(self) -> dict:
-        with self.config_path.open(encoding="utf-8") as f:
-            return self._yaml.load(f) or {}
+        # tolerant: _STARTER_CONFIG carries an em-dash, so a pre-encoding-fix risqlet
+        # on Windows wrote this file as cp1252. save_config_raw normalizes it.
+        return self._yaml.load(read_text_tolerant(self.config_path)) or {}
 
     def save_config_raw(self, data: dict) -> None:
         buf = io.StringIO()
@@ -130,8 +132,9 @@ class Store:
     def load_risk_files(self) -> list[RiskFile]:
         out = []
         for path in self.risk_paths():
-            with path.open(encoding="utf-8") as f:
-                data = self._yaml.load(f)
+            # tolerant: risk statements carry the user's prose, so an old risqlet on
+            # Windows wrote any non-ASCII one as cp1252. save_risk normalizes it.
+            data = self._yaml.load(read_text_tolerant(path))
             out.append(RiskFile(path=path, data=data or {}))
         return out
 
