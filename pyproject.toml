@@ -14,6 +14,12 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
+    # named explicitly rather than "OS Independent": the CLI, register, check,
+    # setup and its hook run everywhere, but `risqlet guardrails` is POSIX-only.
+    # Each of these is exercised by the test matrix — see .github/workflows/test.yml
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Quality Assurance",
@@ -64,6 +70,10 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "posix_only: requires POSIX process handling or a shell hook template; risqlet guardrails is not supported on Windows",
+    "slow: builds and installs a wheel into a fresh venv",
+]
 
 [tool.ruff]
 line-length = 100

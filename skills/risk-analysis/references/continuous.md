@@ -35,7 +35,10 @@ risk-relevant and should sail through.
   summary. Set `ci_gate: block` once the register is trusted enough to gate on.
 - **In-session**: `risqlet ci init --target claude-hooks` prints a settings.json
   hook so that, after each file edit, `risqlet check` surfaces the risks that
-  edit touches — the Semgrep-style continuous signal while you code.
+  edit touches — the Semgrep-style continuous signal while you code. The hook is
+  `risqlet check --hook-input claude --json`, which reads Claude's stdin payload
+  itself: no shell, so it runs on Windows too. It reports only and always exits 0,
+  even under `ci_gate: block` — an editor hook must never break the edit loop.
 
 Both loops are advisory feedback, not a substitute for the gated session: they
 tell you *when* the register needs another look, not *what* the answer is.

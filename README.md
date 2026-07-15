@@ -149,12 +149,36 @@ uv sync --extra mcp        # or: pip install 'risqlet[mcp]'
 Rule of thumb: coding agents with shell access get the best experience from
 the CLI + skills; use MCP when the client cannot run shell commands.
 
+## Platform support
+
+Linux, macOS, and Windows. Each is exercised on every push by the test matrix
+([`.github/workflows/test.yml`](.github/workflows/test.yml)), which runs the full
+suite plus a clean install of the built wheel and `risqlet setup` for every agent
+adapter — so what is claimed here is what CI actually runs.
+
+| Component | Linux | macOS | Windows |
+|---|---|---|---|
+| CLI, register, `validate` / `score` / `export` | ✅ | ✅ | ✅ |
+| `diff` / `check` and the CI gate | ✅ | ✅ | ✅ |
+| `setup` (agent skills, MCP, instructions, commands) | ✅ | ✅ | ✅ |
+| The `setup` check hook | ✅ | ✅ | ✅ |
+| `guardrails` (shell hook templates) | ✅ | ✅ | ❌ |
+
+`risqlet guardrails` is POSIX-only: its hook templates are shell one-liners and its
+verifier uses POSIX process handling. On Windows it reports the guardrail as
+unsupported rather than installing a hook that would not work. Everything else,
+including the `setup` check hook, is shell-free and runs the same everywhere.
+
 ## Honest limits
 
 The human-principal gate is a *convention enforced by validation*, not authentication:
 an agent could write a `human:` event. On Claude Code, hooks add real enforcement;
 elsewhere, the audit trail plus code review is the control. Scores are ordinal
 heuristics for sorting attention, never measurements of "true" risk.
+
+`guardrails` on Windows is a real gap, not a design stance — closing it means moving
+each guardrail's logic out of its shell template and into the CLI, the way the check
+hook already works.
 
 ## Project
 

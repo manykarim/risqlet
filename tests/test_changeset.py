@@ -1,12 +1,14 @@
 """Tests for risqlet diff, check gate, and ci init."""
 
+import io
 import json
+import shlex
 
 import pytest
 
-from risqlet.changeset import build_diff, run_check
+from risqlet.changeset import build_diff, parse_claude_hook_payload, run_check
 from risqlet.ci import CIError, init, template_text
-from risqlet.cli import build_parser
+from risqlet.cli import build_parser, main
 from risqlet.store import Store, init_register
 from risqlet.validate import validate_register
 
@@ -158,6 +160,93 @@ class TestCheckGate:
         assert report["flagged"] == [] and report["exit"] == 0
 
 
+class TestParseClaudeHookPayload:
+    """spec: change-reassessment — check accepts an agent hook payload."""
+
+    def test_real_payload_shape(self):
+        payload = json.dumps({
+            "session_id": "abc", "hook_event_name": "PostToolUse", "tool_name": "Edit",
+            "tool_input": {"file_path": "src/orders/saga.py", "old_string": "a"},
+        })
+        assert parse_claude_hook_payload(payload) == ["src/orders/saga.py"]
+
+    @pytest.mark.parametrize("text", [
+        None, "", "   ", "not json at all", "{oops", "null", "[]", '"a string"', "42",
+        "{}", '{"tool_input": null}', '{"tool_input": {}}', '{"tool_input": "nope"}',
+        '{"tool_input": {"file_path": ""}}', '{"tool_input": {"file_path": "   "}}',
+        '{"tool_input": {"file_path": null}}', '{"tool_input": {"file_path": 7}}',
+    ])
+    def test_unusable_payload_is_empty_never_raises(self, text):
+        assert parse_claude_hook_payload(text) == []
+
+    def test_path_is_stripped(self):
+        assert parse_claude_hook_payload(
+            '{"tool_input": {"file_path": "  src/a.py \\n"}}') == ["src/a.py"]
+
+
+class TestCheckHookMode:
+    """spec: change-reassessment — hook mode reports but never blocks."""
+
+    def _accepted_untested(self, store):
+        write_risk(store, "R-0001", evidence='"src/orders/saga.py"', scores=SCORED,
+                   status="accepted",
+                   mitigations='[{id: M-0001, risk_ids: [R-0001], treatment: reduce, '
+                   'lever: detection, barrier: detect, concrete: c, residual_note: r, '
+                   'tests: ["pytest:tests/test_saga.py::test_ok"]}]')
+
+    def _set_mode(self, store, mode):
+        cfg = store.load_config_raw()
+        cfg.setdefault("constraints", {})["ci_gate"] = mode
+        store.save_config_raw(cfg)
+
+    def _run(self, store, monkeypatch, payload, extra=()):
+        monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+        root = str(store.root.parent)
+        return main(["check", "--hook-input", "claude", "--dir", root, *extra])
+
+    def test_payload_resolves_edited_file(self, store, monkeypatch, capsys):
+        self._accepted_untested(store)
+        payload = json.dumps({"tool_input": {"file_path": "src/orders/saga.py"}})
+        assert self._run(store, monkeypatch, payload, ["--json"]) == 0
+        assert "R-0001" in capsys.readouterr().out
+
+    def test_block_mode_still_exits_zero(self, store, monkeypatch, capsys):
+        self._accepted_untested(store)
+        self._set_mode(store, "block")
+        payload = json.dumps({"tool_input": {"file_path": "src/orders/saga.py"}})
+        # same register + file exits 1 via --files; hook mode must not break the loop
+        assert self._run(store, monkeypatch, payload, ["--json"]) == 0
+        assert json.loads(capsys.readouterr().out)["flagged"]
+        assert main(["check", "--files", "src/orders/saga.py",
+                     "--dir", str(store.root.parent)]) == 1
+
+    @pytest.mark.parametrize("payload", ["", "not json", "{}", '{"tool_input": {}}'])
+    def test_malformed_payload_is_silent_noop(self, store, monkeypatch, capsys,
+                                              payload):
+        self._accepted_untested(store)
+        self._set_mode(store, "block")
+        assert self._run(store, monkeypatch, payload) == 0
+        out = capsys.readouterr()
+        assert out.out == "" and "Traceback" not in out.err
+
+    def test_internal_error_never_escapes(self, store, monkeypatch, capsys):
+        self._accepted_untested(store)
+
+        def boom(*a, **k):
+            raise RuntimeError("register exploded")
+
+        monkeypatch.setattr("risqlet.changeset.run_check", boom)
+        payload = json.dumps({"tool_input": {"file_path": "src/orders/saga.py"}})
+        assert self._run(store, monkeypatch, payload) == 0
+        assert "Traceback" not in capsys.readouterr().err
+
+    def test_stdin_mode_semantics_unchanged(self, store, monkeypatch):
+        self._accepted_untested(store)
+        self._set_mode(store, "block")
+        monkeypatch.setattr("sys.stdin", io.StringIO("src/orders/saga.py\n"))
+        assert main(["check", "--stdin", "--dir", str(store.root.parent)]) == 1
+
+
 class TestCiInit:
     def test_github(self, tmp_path):
         result = init("github", tmp_path)
@@ -173,6 +262,34 @@ class TestCiInit:
         result = init("claude-hooks", tmp_path)
         assert result["printed"]
         assert json.loads(result["content"])["hooks"]["PostToolUse"]
+
+    def _template_commands(self):
+        payload = json.loads(template_text("claude-hooks"))
+        return [h["command"] for e in payload["hooks"]["PostToolUse"] for h in e["hooks"]]
+
+    def test_claude_hooks_matches_installed_command(self):
+        """spec: change-reassessment — the two hook surfaces cannot drift."""
+        from risqlet.setup import render
+
+        assert self._template_commands() == [render.SETUP_HOOK_COMMAND]
+
+    def test_claude_hooks_reads_no_unset_env_var(self):
+        # regression: the template used to read $CLAUDE_TOOL_FILE_PATH, which Claude
+        # Code never sets — it silently checked an empty path on every platform
+        assert not any("$" in c for c in self._template_commands())
+
+    def test_claude_hooks_resolves_the_edited_file(self, store, monkeypatch, capsys):
+        """The emitted command actually checks the payload's file."""
+        write_risk(store, "R-0001", evidence='"src/orders/saga.py"', scores=SCORED,
+                   status="accepted", mitigations='[{id: M-0001, risk_ids: [R-0001], '
+                   'treatment: reduce, lever: detection, barrier: detect, concrete: c, '
+                   'residual_note: r, tests: ["pytest:tests/test_saga.py::test_ok"]}]')
+        argv = shlex.split(self._template_commands()[0])
+        assert argv[0] == "risqlet"
+        payload = json.dumps({"tool_input": {"file_path": "src/orders/saga.py"}})
+        monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+        assert main([*argv[1:], "--dir", str(store.root.parent)]) == 0
+        assert "R-0001" in capsys.readouterr().out
 
     def test_arbitrary_path(self, tmp_path):
         dest = tmp_path / "custom" / "flow.yml"

@@ -1,6 +1,7 @@
 """Tests for guardrail hook verification and the verify-by-default install gate."""
 
 import json
+import shutil
 
 import pytest
 
@@ -21,12 +22,14 @@ def rendered(template_id, dirs=("."), test_command=None):
 
 
 class TestVerify:
+    @pytest.mark.posix_only
     def test_good_secret_hook_passes(self, tmp_path):
         r = verify_guardrail(rendered("secret-scan-posttool", ["src/auth"]), tmp_path)
         assert r.ok
         names = {c.name for c in r.checks}
         assert {"benign-passes", "violation-caught"} <= names
 
+    @pytest.mark.posix_only
     def test_good_lint_hook_passes(self, tmp_path):
         assert verify_guardrail(rendered("lint-format-posttool"), tmp_path).ok
 
@@ -39,6 +42,7 @@ class TestVerify:
         r = verify_guardrail(g, tmp_path)
         assert not r.ok and any(c.name == "tool:nope_tool_xyz" for c in r.failed())
 
+    @pytest.mark.posix_only
     def test_syntax_error_fails(self, tmp_path):
         g = RenderedGuardrail(
             template_id="x", surface="claude-hook", enforcement="hard", params={},
@@ -47,6 +51,7 @@ class TestVerify:
         r = verify_guardrail(g, tmp_path)
         assert not r.ok and any(c.name == "syntax" for c in r.failed())
 
+    @pytest.mark.posix_only
     def test_false_block_fails(self, tmp_path):
         # a hook that blocks even the benign fixture must fail verification
         g = RenderedGuardrail(
@@ -57,6 +62,7 @@ class TestVerify:
         r = verify_guardrail(g, tmp_path)
         assert not r.ok and any(c.name == "benign-passes" for c in r.failed())
 
+    @pytest.mark.posix_only
     def test_hang_times_out(self, tmp_path, monkeypatch):
         monkeypatch.setattr("risqlet.guardrails.verify.TIMEOUT_S", 2)
         g = RenderedGuardrail(
@@ -64,6 +70,75 @@ class TestVerify:
             content="x", command='sleep 30',
             verify=VerifySpec(tools=["bash"], blocking=False, input="none"))
         r = verify_guardrail(g, tmp_path)
+        assert not r.ok and any(c.name == "runs" for c in r.failed())
+
+    def test_shell_free_hook_verifies_without_a_shell(self, tmp_path, monkeypatch,
+                                                      risqlet_on_path):
+        """spec: hook-verification — a shell-free hook needs no shell.
+
+        Deliberately not marked posix_only: this is the cross-platform property
+        itself, so it must run on Windows. The command is `risqlet` rather than
+        `true` because `true` is not an executable on Windows — using it would
+        make this test skip on the one platform it exists to cover.
+        """
+        real_which = shutil.which
+        monkeypatch.setattr("risqlet.guardrails.verify.shutil.which",
+                            lambda t, *a, **k: None if t == "bash" else real_which(t))
+        g = RenderedGuardrail(
+            template_id="x", surface="claude-hook", enforcement="hard", params={},
+            content="x", command="risqlet --help",
+            verify=VerifySpec(tools=[], blocking=False, input="none"))
+        r = verify_guardrail(g, tmp_path)
+        assert r.ok, r.failed()
+        assert not any(c.name == "tool:bash" for c in r.checks)
+        assert not any(c.name == "syntax" for c in r.checks)
+
+    def test_shell_hook_still_requires_its_shell(self, tmp_path, monkeypatch):
+        """spec: hook-verification — a shell hook without bash still fails."""
+        real_which = shutil.which
+        monkeypatch.setattr("risqlet.guardrails.verify.shutil.which",
+                            lambda t, *a, **k: None if t == "bash" else real_which(t))
+        g = RenderedGuardrail(
+            template_id="x", surface="claude-hook", enforcement="hard", params={},
+            content="x", command='echo "$RISQLET_HOOK_FILE" | grep -q x',
+            verify=VerifySpec(tools=[], blocking=False, input="none"))
+        r = verify_guardrail(g, tmp_path)
+        assert not r.ok
+        assert any(c.name == "tool:bash" for c in r.failed())
+
+    def test_shell_hook_reports_unsupported_on_windows(self, tmp_path, monkeypatch):
+        """spec: cross-platform-support — unsupported is stated, not crashed into."""
+        monkeypatch.setattr("risqlet.guardrails.verify._is_windows", lambda: True)
+        g = RenderedGuardrail(
+            template_id="x", surface="claude-hook", enforcement="hard", params={},
+            content="x", command='grep -q x "$RISQLET_HOOK_FILE"',
+            verify=VerifySpec(tools=["grep"], blocking=True, input="file",
+                              benign="ok\n", violation="x\n"))
+        r = verify_guardrail(g, tmp_path)
+        assert not r.ok
+        platform_check = [c for c in r.failed() if c.name == "platform"]
+        assert platform_check and "not supported on Windows" in platform_check[0].detail
+
+    def test_shell_free_hook_still_supported_on_windows(self, tmp_path, monkeypatch,
+                                                        risqlet_on_path):
+        # the Windows refusal must be scoped to shell hooks — the shell-free check
+        # hook is exactly what does work there
+        monkeypatch.setattr("risqlet.guardrails.verify._is_windows", lambda: True)
+        g = RenderedGuardrail(
+            template_id="x", surface="claude-hook", enforcement="hard", params={},
+            content="x", command="risqlet --help",
+            verify=VerifySpec(tools=[], blocking=False, input="none"))
+        assert verify_guardrail(g, tmp_path).ok
+
+    def test_kill_falls_back_when_killpg_missing(self, tmp_path, monkeypatch):
+        """os.killpg does not exist on Windows — must not die in AttributeError."""
+        monkeypatch.setattr("risqlet.guardrails.verify.TIMEOUT_S", 2)
+        monkeypatch.delattr("risqlet.guardrails.verify.os.killpg", raising=False)
+        g = RenderedGuardrail(
+            template_id="x", surface="claude-hook", enforcement="hard", params={},
+            content="x", command="sleep 30",
+            verify=VerifySpec(tools=[], blocking=False, input="none"))
+        r = verify_guardrail(g, tmp_path)  # must time out cleanly, not raise
         assert not r.ok and any(c.name == "runs" for c in r.failed())
 
     def test_advisory_guardrail_is_noop(self, tmp_path):
@@ -108,6 +183,7 @@ def store_with_secret_risk(tmp_path):
     return store
 
 
+@pytest.mark.posix_only
 class TestInstallGate:
     def test_claude_install_writes_real_command(self, store_with_secret_risk, tmp_path):
         proj = tmp_path / "proj"
@@ -190,6 +266,7 @@ class TestCoverageStopDetection:
         assert g is not None and "pytest -q" in g.command
 
 
+@pytest.mark.posix_only
 class TestInstalledClaudeStdinContract:
     """Regression: the installed Claude hook must read the file path from the
     stdin JSON payload Claude actually sends — not an env var (caught by live

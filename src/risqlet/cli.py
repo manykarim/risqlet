@@ -339,6 +339,9 @@ def cmd_diff(args) -> int:
 
 
 def cmd_check(args) -> int:
+    if args.hook_input:
+        return _cmd_check_hook(args)
+
     from risqlet.changeset import ChangesetError, run_check
 
     stdin_text = None
@@ -350,13 +353,37 @@ def cmd_check(args) -> int:
     except ChangesetError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    if args.json:
+    _print_check_report(report, args.json)
+    return report["exit"]
+
+
+def _print_check_report(report: dict, as_json: bool) -> None:
+    if as_json:
         print(json.dumps(report, indent=2))
     else:
         print(f"gate mode: {report['mode']} — {len(report['flagged'])} flagged")
         for f in report["flagged"]:
             print(f"  {f['risk']} [{f['status']}]: {f['flag']} -> {f['suggested_action']}")
-    return report["exit"]
+
+
+def _cmd_check_hook(args) -> int:
+    """Hook mode: report what the edit touched, never break the agent's loop.
+
+    Always exits 0 — the gate's block/warn contract governs CI, not an editor
+    hook. Replaces the old shell hook's `2>/dev/null || true`, which is why any
+    failure here is swallowed rather than surfaced.
+    """
+    try:
+        from risqlet.changeset import parse_claude_hook_payload, run_check
+
+        files = parse_claude_hook_payload(sys.stdin.read())
+        if not files:  # no edited path in the payload — nothing to check
+            return 0
+        report = run_check(_store(args), base=args.base, files=files)
+        _print_check_report(report, args.json)
+    except Exception:
+        pass
+    return 0
 
 
 def cmd_ci_init(args) -> int:
@@ -487,10 +514,11 @@ def cmd_setup(args) -> int:
     import sys as _sys
 
     from risqlet.setup import (
+        DETECT_LABELS,
         SetupError,
         apply_plan,
         build_plan,
-        detect,
+        detect_sources,
         load_adapters,
         remove,
         status,
@@ -511,13 +539,16 @@ def cmd_setup(args) -> int:
               else f"removed {result['removed']} entrie(s); {result['remaining']} remain")
         return 0
 
-    detected = detect(adapters)
+    sources = detect_sources(adapters)
+    detected = list(sources)
     interactive = (not args.agents and not args.all_detected
                    and not args.update and _sys.stdin.isatty())
 
     if interactive:
+        # say *how* each was detected — a project dir is not an installed agent
         opts = [(aid, f"{adapters[aid].name}"
-                 + ("  (detected)" if aid in detected else "")) for aid in adapters]
+                 + (f"  ({DETECT_LABELS[sources[aid]]})" if aid in sources else ""))
+                for aid in adapters]
         agent_ids = _tui.multiselect("Configure which agents?", opts, set(detected))
         if not agent_ids:
             print("nothing selected")
@@ -705,7 +736,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_check.add_argument("--base", default=None, help="git base ref (default HEAD~1)")
     p_check.add_argument("--files", nargs="*", default=None)
-    p_check.add_argument("--stdin", action="store_true")
+    p_check.add_argument("--stdin", action="store_true",
+                         help="read newline-separated changed paths from stdin")
+    p_check.add_argument("--hook-input", choices=["claude"], default=None,
+                         help="read an agent hook payload (JSON) from stdin instead; "
+                              "reports only, always exits 0")
     _add_common(p_check)
     p_check.set_defaults(func=cmd_check)
 

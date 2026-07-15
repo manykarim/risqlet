@@ -41,6 +41,14 @@ scopes. Setup SHALL install the intersection of requested components and adapter
 capability, and SHALL report per agent what was installed and what was skipped
 (with the reason). Instructions SHALL be supported by every adapter.
 
+Detection SHALL report what it actually found. An adapter's declared directories are
+resolved relative to the current working directory unless anchored (`~`), so a
+project-local directory such as `.claude` or `.github` present in the repo means only
+that the repo contains that directory — not that the agent is installed on the
+machine. Detection SHALL distinguish an agent found on `PATH` from one inferred from
+a directory, and SHALL NOT report an agent as installed on the strength of a
+directory belonging to the project being scanned.
+
 #### Scenario: Full Claude install
 - **WHEN** setup installs the Claude adapter at project scope
 - **THEN** skills, an MCP registration, an instructions section, hooks, and
@@ -55,6 +63,12 @@ capability, and SHALL report per agent what was installed and what was skipped
 #### Scenario: Unsupported component skipped, not failed
 - **WHEN** a requested component is not supported by an agent
 - **THEN** it is skipped with a labeled note and the rest still install
+
+#### Scenario: Detection does not depend on where it was run from
+- **WHEN** `detect` runs in a project containing a `.claude` directory on a machine
+  with no Claude Code installed
+- **THEN** the result distinguishes that this came from a project directory rather
+  than reporting the agent as installed on the machine
 
 ### Requirement: MCP registration rendered per agent schema
 Setup SHALL render one canonical MCP server spec into each agent's own config
@@ -108,4 +122,52 @@ guardrail install: a failing hook is skipped (or installed with `--force`), and
 #### Scenario: Setup skips an unverifiable hook
 - **WHEN** setup would install a hook whose required tool is missing
 - **THEN** the hook is skipped with its reason and the rest of the setup proceeds
+
+### Requirement: the installed check hook runs on every supported platform
+The hook `risqlet setup` installs SHALL run on every platform risqlet supports
+(Linux, macOS, Windows) without requiring a shell or any interpreter beyond
+`risqlet` itself. Its command SHALL be a single executable invocation with literal
+arguments: no shell metacharacters (`$(...)`, `"`, `|`, `;`, `&&`, `||`,
+redirections), no `bash`, and no separate `python3`/`node`/PowerShell process. Any
+payload parsing the hook needs SHALL live in the `risqlet` CLI, not in the hook
+string. risqlet SHALL NOT ship a second, platform-specific variant of this hook.
+
+#### Scenario: Hook installs on a host without bash
+- **WHEN** `risqlet setup` installs the Claude Code hook component on a host where
+  `bash` is not on PATH
+- **THEN** the hook passes verification and is written, rather than being skipped
+  with "hook failed verification: bash not on PATH"
+
+#### Scenario: Hook command is shell-free
+- **WHEN** the command written to `.claude/settings.json` is inspected
+- **THEN** it contains no shell metacharacters and invokes only `risqlet`
+
+#### Scenario: Hook does not depend on the interpreter's name
+- **WHEN** the host provides Python as `python` rather than `python3`
+- **THEN** the hook still verifies and runs, because it spawns no interpreter itself
+
+### Requirement: installed hooks are identifiable without a shell comment
+risqlet SHALL be able to recognize the hooks it installed in order to remove them
+without touching a user's own hooks. Because a shell-free command cannot carry a
+trailing `# risqlet:check` comment — the comment would be passed to the executable
+as literal arguments — the hook SHALL be identified by its own invocation rather
+than by an appended comment.
+
+Removal SHALL also recognize hooks written by earlier risqlet versions, which carry
+the shell command and its trailing comment marker, so that upgrading does not orphan
+a hook that can never be cleaned up. Re-running `risqlet setup` SHALL replace a
+previously installed hook rather than leaving a stale one beside the new one.
+
+#### Scenario: Marker is not passed to the executable
+- **WHEN** the installed hook command is run
+- **THEN** no marker text reaches `risqlet` as an argument and the command succeeds
+
+#### Scenario: Hook installed by an older version is still removable
+- **WHEN** `risqlet setup --remove` runs against a settings file whose hook was
+  installed by an earlier version carrying the old marker
+- **THEN** that hook is removed and the user's own hooks are left intact
+
+#### Scenario: Re-running setup replaces rather than duplicates
+- **WHEN** `risqlet setup` runs on a project that already has an older risqlet hook
+- **THEN** the settings file ends with exactly one risqlet hook, the current one
 

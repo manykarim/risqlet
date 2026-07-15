@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
+import shutil
+import subprocess
 from pathlib import Path
 
 MCP_COMMAND = "risqlet"
@@ -18,7 +21,9 @@ MD_BEGIN = "<!-- risqlet:setup:begin -->"
 MD_END = "<!-- risqlet:setup:end -->"
 TOML_BEGIN = "# risqlet:mcp:begin"
 TOML_END = "# risqlet:mcp:end"
-HOOK_MARKER = "# risqlet:check"
+# The hook's own invocation is its provenance marker — a shell-free command cannot
+# carry a trailing comment. Defined next to SETUP_HOOK_COMMAND below.
+HOOK_MARKER = "risqlet check --hook-input"
 
 INSTRUCTIONS_BODY = """\
 ## risqlet (risk analysis)
@@ -109,41 +114,73 @@ def apply_copy_commands(target_dir: Path) -> list[Path]:
     return written
 
 
-# Claude Code passes the tool payload as JSON on stdin (not an env var).
-SETUP_HOOK_COMMAND = (
-    'f="$(python3 -c \'import json,sys;'
-    'print(json.load(sys.stdin).get("tool_input",{}).get("file_path",""))\' 2>/dev/null)"; '
-    'risqlet check --files "$f" --json 2>/dev/null || true')
-SETUP_HOOK_TOOLS = ["risqlet", "python3", "bash"]
+# Claude Code passes the tool payload as JSON on stdin (not an env var). `check
+# --hook-input` parses that itself, so the hook needs no shell and no second
+# interpreter — it runs as-is on Windows, where bash and `python3` are absent.
+# Keep this shell-free: no metacharacters, no marker comment (it would reach
+# risqlet as argv). See tests in test_setup.py::TestHookIsPlatformIndependent.
+SETUP_HOOK_COMMAND = "risqlet check --hook-input claude --json"
+SETUP_HOOK_TOOLS = ["risqlet"]
+
+# The command identifies itself; hooks from before the shell-free rewrite carry a
+# trailing comment marker instead, which removal must still recognize.
+LEGACY_HOOK_MARKER = "# risqlet:check"
+
+VERIFY_TIMEOUT_S = 10
+_VERIFY_PAYLOAD = '{"tool_input": {"file_path": ""}}'
 
 
 def verify_setup_hook() -> list[str]:
-    """Preflight the setup check hook; returns a list of failure reasons (empty = ok)."""
-    import shutil
-    import subprocess
+    """Verify the setup check hook; returns a list of failure reasons (empty = ok).
 
+    Runs the real command against a synthetic payload rather than syntax-checking
+    a shell string: it proves the hook resolves, runs, and honors its exit-0
+    contract — which subsumes what `bash -n` proved for the old shell hook.
+    """
     fails = []
     for tool in SETUP_HOOK_TOOLS:
         if shutil.which(tool) is None:
             fails.append(f"{tool} not on PATH")
-    if shutil.which("bash"):
-        rc = subprocess.run(["bash", "-n", "-c", SETUP_HOOK_COMMAND],
-                            capture_output=True).returncode
-        if rc != 0:
-            fails.append("hook command has a syntax error")
+    if fails:
+        return fails
+    try:
+        proc = subprocess.run(shlex.split(SETUP_HOOK_COMMAND), input=_VERIFY_PAYLOAD,
+                              capture_output=True, text=True, timeout=VERIFY_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        fails.append(f"hook did not finish within {VERIFY_TIMEOUT_S}s")
+    except OSError as exc:
+        fails.append(f"hook could not run: {exc}")
+    else:
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "").strip()[:120]
+            fails.append(f"hook exited {proc.returncode}"
+                         + (f": {detail}" if detail else ""))
     return fails
+
+
+def _is_risqlet_hook(hook: dict) -> bool:
+    command = hook.get("command", "")
+    return HOOK_MARKER in command or LEGACY_HOOK_MARKER in command
 
 
 def apply_json_hooks(path: Path) -> None:
     data = json.loads(path.read_text()) if path.exists() and path.read_text().strip() else {}
     hooks = data.setdefault("hooks", {})
     post = hooks.setdefault("PostToolUse", [])
-    if not any(HOOK_MARKER in h.get("command", "")
-               for e in post for h in e.get("hooks", [])):
-        post.append({"matcher": "Write|Edit", "hooks": [{
-            "type": "command", "command": f"{SETUP_HOOK_COMMAND}  {HOOK_MARKER}"}]})
+    # drop any hook of ours first (including a pre-rewrite shell one), so an
+    # upgrade replaces rather than leaving a stale hook beside the new one
+    _drop_risqlet_hooks(post)
+    post.append({"matcher": "Write|Edit", "hooks": [{
+        "type": "command", "command": SETUP_HOOK_COMMAND}]})
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def _drop_risqlet_hooks(entries: list) -> None:
+    """Strip our hooks from one event's entries, leaving the user's untouched."""
+    for entry in entries:
+        entry["hooks"] = [h for h in entry.get("hooks", []) if not _is_risqlet_hook(h)]
+    entries[:] = [e for e in entries if e.get("hooks")]
 
 
 # -- remove --------------------------------------------------------------------
@@ -199,10 +236,7 @@ def remove_json_hooks(path: Path) -> None:
     data = json.loads(path.read_text())
     hooks = data.get("hooks", {})
     for event in list(hooks):
-        for entry in hooks[event]:
-            entry["hooks"] = [h for h in entry.get("hooks", [])
-                              if HOOK_MARKER not in h.get("command", "")]
-        hooks[event] = [e for e in hooks[event] if e.get("hooks")]
+        _drop_risqlet_hooks(hooks[event])
         if not hooks[event]:
             del hooks[event]
     if not hooks:
