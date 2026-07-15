@@ -127,6 +127,42 @@ class TestRegisterOverLegacyFile:
         assert store.load_config_raw()["project"] == "café — demo"
 
 
+class TestNewlineSemantics:
+    """The tolerant read must behave exactly like Path.read_text(), which the first
+    version did not: it used bytes.decode(), skipping universal-newline translation,
+    so a CRLF file kept literal \r in the parsed text and wrote them back — leaving
+    mixed line endings in a file risqlet calls deterministic. Found by the Windows
+    leg; reproducible here by writing CRLF bytes directly.
+    """
+
+    def test_crlf_file_reads_as_lf(self, tmp_path):
+        from risqlet.textio import read_text_tolerant
+
+        path = tmp_path / "crlf.md"
+        path.write_bytes(b"line one\r\nline two\r\n")
+        assert read_text_tolerant(path) == "line one\nline two\n"
+
+    def test_crlf_legacy_file_reads_as_lf(self, tmp_path):
+        """Both branches must agree — the fallback path needs it too."""
+        from risqlet.textio import read_text_tolerant
+
+        path = tmp_path / "crlf-legacy.md"
+        path.write_bytes("caf\u00e9 \u2014 x\r\nnext\r\n".encode("cp1252"))
+        assert read_text_tolerant(path) == "café — x\nnext\n"
+
+    def test_crlf_register_saves_as_lf(self, tmp_path):
+        store = Store(init_register(tmp_path, "demo"))
+        path = store.register_dir / "R-0001.yaml"
+        risk = ("# a comment\nschema_version: 1\nid: R-0001\n"
+                "statement: Because a thing happens, harm may occur, causing loss\n"
+                "aspects: [iso25010.reliability]\n"
+                "elicited_by: {method: inside-out, evidence: [\"src/a.py\"]}\n"
+                "scores: []\nstatus: proposed\nmitigations: []\n")
+        path.write_bytes(risk.replace("\n", "\r\n").encode("utf-8"))
+        store.save_risk(store.load_risk_files()[0])
+        assert b"\r\n" not in path.read_bytes()
+
+
 class TestToleranceIsScoped:
     """The fallback exists because risqlet caused the bad bytes. Where it provably
     did not, a decode error is real news and must still raise."""
