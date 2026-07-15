@@ -15,7 +15,9 @@ All notable changes to risqlet are documented here. The format follows
   every catalog pack, became `â€"` with nothing raising), and writes of text outside
   cp1252 crashed with `UnicodeEncodeError` — a risk statement containing `→` or CJK
   was enough. `git diff` output and hook stdout were exposed too, via
-  `subprocess(text=True)`. No on-disk format changed: every file was already UTF-8;
+  `subprocess(text=True)`, and risqlet's **own stdout** was locale-encoded — so
+  `--json` output and the `risqlet mcp` stdio transport, both machine interfaces
+  agents parse, emitted cp1252 on Windows. The CLI now pins its streams to UTF-8. No on-disk format changed: every file was already UTF-8;
   risqlet now reads them as what they are. `events.jsonl` was never affected —
   `json.dumps` escapes non-ASCII to `\uXXXX` by default.
 - **Output no longer depends on the host's line endings.** Text writes pin
