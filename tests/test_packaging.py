@@ -205,6 +205,23 @@ class TestCleanInstall:
         assert r.returncode == 0, r.stderr
         assert json.loads(r.stdout)["actions"], "no adapter actions planned"
 
+    def test_cli_emits_utf8_not_the_console_code_page(self, clean_install):
+        """spec: cross-platform-support — stdout is a machine interface.
+
+        Caught by the Windows CI leg, not by reasoning: risqlet's own stdout was
+        encoded in the host locale, so on Windows an em-dash in `--help` went out as
+        cp1252 byte 0x97 and any UTF-8 consumer — an agent parsing `--json`, or the
+        MCP stdio transport — failed to decode it. Asserts raw bytes, because
+        `text=True` would decode them and hide exactly what is being tested.
+        """
+        env = dict(os.environ)
+        env["PATH"] = str(clean_install.bin_dir) + os.pathsep + env["PATH"]
+        r = subprocess.run([clean_install.exe, "--help"], cwd=clean_install.work,
+                           env=env, capture_output=True, timeout=120)  # bytes, not text
+        assert r.returncode == 0
+        r.stdout.decode("utf-8")  # raises UnicodeDecodeError if we emitted cp1252
+        assert b"\x97" not in r.stdout  # cp1252's em-dash byte
+
     def test_ci_templates_ship(self, clean_install):
         """ci init reads ci/templates/*.json — force-included package data."""
         r = run_installed(clean_install, "ci", "init", "--target", "claude-hooks")

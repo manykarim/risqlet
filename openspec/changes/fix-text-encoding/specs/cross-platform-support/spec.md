@@ -36,6 +36,23 @@ round-tripping unchanged — and not on exit status alone.
 
 ## ADDED Requirements
 
+### Requirement: the CLI emits UTF-8 regardless of the console encoding
+risqlet SHALL encode its stdout and stderr as UTF-8 on every platform, rather than in the host's console or locale encoding, because its output is a machine interface: `--json` is parsed by agents and CI, and `risqlet mcp` speaks JSON over stdio. Reading files as UTF-8 while emitting the locale encoding would leave the interface handed to callers platform-dependent.
+
+Correctness here SHALL be asserted on the raw bytes of the output. Decoding the
+output before asserting would hide the defect, since the assertion would then be
+testing the test's own decoder rather than what risqlet emitted.
+
+#### Scenario: Output decodes as UTF-8 on a non-UTF-8 console
+- **WHEN** the CLI runs on a host whose console encoding is cp1252 and prints text
+  containing an em-dash
+- **THEN** the bytes on stdout decode as UTF-8, and do not contain the cp1252
+  single-byte encoding of that character
+
+#### Scenario: Machine-readable output survives a pipe
+- **WHEN** an agent or the MCP stdio transport consumes risqlet's output as UTF-8
+- **THEN** it decodes successfully on every supported platform
+
 ### Requirement: encoding-correctness is enforced, not remembered
 risqlet SHALL enforce explicit text encoding automatically rather than by review
 convention, since an omitted `encoding=` is invisible on the platforms most

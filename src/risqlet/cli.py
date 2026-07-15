@@ -837,7 +837,29 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _force_utf8_streams() -> None:
+    """Emit UTF-8 on stdout/stderr regardless of the platform's console encoding.
+
+    risqlet's stdout is a machine interface — `--json` is parsed by agents and CI,
+    and `risqlet mcp` speaks JSON over stdio. Python encodes stdout in the locale
+    encoding, which is cp1252 on Windows: an em-dash in the output goes out as byte
+    0x97 and any UTF-8 consumer fails to decode it. Fixing only how we *read* files
+    would leave the interface we hand to callers still locale-dependent.
+
+    Must run before parse_args: `--help` prints and exits inside it.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:  # already replaced (pytest capture, a StringIO)
+            continue
+        try:
+            reconfigure(encoding="utf-8")
+        except (ValueError, OSError):  # detached or non-reconfigurable stream
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_streams()
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)

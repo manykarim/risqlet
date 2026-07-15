@@ -17,8 +17,11 @@ em-dash in every catalog pack. Two distinct failures follow, both verified:
 - **Writes crash hard.** cp1252 cannot encode `→`, CJK, or emoji, so
   `write_text()` raises `UnicodeEncodeError: 'charmap' codec can't encode character`.
   A risk statement like `request → timeout` — ordinary phrasing for this tool —
-  makes `risqlet` traceback on Windows. `events.jsonl` appends through the same
-  unencoded path, so the append-only log is equally exposed.
+  makes `risqlet` traceback on Windows. (`events.jsonl` turned out **not** to be
+  exposed — corrected during implementation: `json.dumps` defaults to
+  `ensure_ascii=True`, so the log is written as pure ASCII with `\uXXXX` escapes. A
+  test now pins that, since passing `ensure_ascii=False` for readability would
+  quietly put the log back in range of this bug.)
 
 The just-landed cross-platform CI does not catch either one, and would not have: no
 test writes or asserts a non-ASCII risk statement, so Windows stays green while the
@@ -31,6 +34,13 @@ mojibake gets committed to a user's register and propagates.
 
 ## What Changes
 
+- **risqlet's own stdout/stderr are UTF-8.** Found by the Windows CI leg, not by
+  this proposal's original analysis: risqlet encoded its output in the host console's
+  encoding, so on Windows an em-dash in `--help` left as cp1252 byte `0x97` and any
+  UTF-8 consumer failed to decode it. This is the most exposed surface of the bug —
+  `--json` is parsed by agents and CI, and `risqlet mcp` speaks JSON over stdio, so
+  the corruption was on the machine interface, not just on disk. `subprocess(text=True)`
+  had the same defect on the reading side (`git diff` output, hook stdout).
 - **Every text read and write in `src/risqlet` specifies `encoding="utf-8"`.** The
   register, config, event log, catalog packs, policy packs, agent configs, CI and
   guardrail templates, and bundled skills are UTF-8 on every platform regardless of
@@ -59,8 +69,10 @@ mojibake gets committed to a user's register and propagates.
 
 - Changing the encoding of anything on disk. All existing files are already UTF-8;
   this makes risqlet *read them as what they are*.
-- Locale-aware output formatting, translation, or console code-page handling.
-  Terminal rendering of a correctly-decoded string is the terminal's business.
+- Locale-aware output *formatting* or translation. Note this no longer excludes the
+  console encoding: risqlet now pins its own stdout/stderr to UTF-8, because that
+  stream is a machine interface. What remains out of scope is how a *terminal chooses
+  to draw* a correctly-encoded string — that is the terminal's business, not ours.
 - `risqlet guardrails` on Windows, which remains POSIX-only.
 
 ## Capabilities
