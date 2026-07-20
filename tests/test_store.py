@@ -31,6 +31,39 @@ def register(tmp_path):
     return Store(risqlet)
 
 
+class TestMalformedYaml:
+    """A malformed register file is a StoreError with the path, not a raw traceback.
+
+    ruamel raises DuplicateKeyError (a YAMLError, not a StoreError), and the CLI's
+    main() only catches StoreError — so `status`/`check`/`score`/`diff` printed a
+    traceback on a bad config where `validate` did not. The load methods now wrap it.
+    """
+
+    def test_config_duplicate_key_raises_storeerror(self, register):
+        # a duplicate top-level key — the exact shape that tracebacked
+        register.config_path.write_text(
+            "schema_version: 1\nconstraints: {}\nconstraints: {}\n", encoding="utf-8")
+        with pytest.raises(StoreError) as exc:
+            register.load_config_raw()
+        assert str(register.config_path) in str(exc.value)
+        assert "duplicate key" in str(exc.value)
+
+    def test_risk_file_duplicate_key_raises_storeerror(self, register):
+        bad = register.register_dir / "R-0001.yaml"
+        bad.write_text("id: R-0001\nstatement: x\nstatement: y\n", encoding="utf-8")
+        with pytest.raises(StoreError) as exc:
+            register.load_risk_files()
+        assert "R-0001.yaml" in str(exc.value) and "duplicate key" in str(exc.value)
+
+    def test_non_yaml_error_is_not_swallowed(self, register):
+        # over-catching would hide real bugs; a missing file is not a YAML error
+        with pytest.raises(FileNotFoundError):
+            register._load_yaml(register.root / "does-not-exist.yaml")
+
+    def test_valid_yaml_still_loads(self, register):
+        assert register.load_config_raw()["project"] == "demo"
+
+
 class TestInit:
     def test_scaffold(self, tmp_path):
         risqlet = init_register(tmp_path, "demo")

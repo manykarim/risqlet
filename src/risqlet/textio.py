@@ -18,6 +18,31 @@ import io
 import sys
 from pathlib import Path
 
+from ruamel.yaml.error import YAMLError
+
+#: Cap a wrapped YAML error's one-line message. ruamel inlines the whole duplicated
+#: value into `.problem`, so a large mapping can produce a multi-KB single line —
+#: fine to raise, ugly in a CI log. Truncate for display; the original is chained.
+_YAML_DETAIL_MAX = 200
+
+
+def yaml_detail(exc: YAMLError) -> str:
+    """A single-line, human-useful reason for a YAML parse failure.
+
+    A MarkedYAMLError's `.problem` is the concise sentence ("found duplicate key
+    ...") plus its line; str(exc)'s first line is only "while constructing a mapping"
+    scaffolding. Falls back to that first line for a non-marked error (e.g. a
+    ReaderError from a NUL byte, which has no `.problem`).
+    """
+    problem = getattr(exc, "problem", None)
+    mark = getattr(exc, "problem_mark", None)
+    if problem:
+        detail = problem + (f" (line {mark.line + 1})" if mark is not None else "")
+    else:
+        lines = [ln for ln in str(exc).splitlines() if ln.strip()]
+        detail = lines[0] if lines else "invalid YAML"
+    return detail if len(detail) <= _YAML_DETAIL_MAX else detail[:_YAML_DETAIL_MAX] + "…"
+
 #: What Python used on Windows before we said otherwise. A fixed encoding, not
 #: locale.getpreferredencoding(): the fallback must behave identically on every
 #: platform, or the bug becomes unreproducible on the host we develop on — which is

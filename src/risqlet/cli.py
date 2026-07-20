@@ -7,11 +7,18 @@ import json
 import sys
 from pathlib import Path
 
+from risqlet.catalog.loader import CatalogError
 from risqlet.exports.renderers import FORMATS, ExportError, render
 from risqlet.findings import Finding
+from risqlet.policies.engine import PolicyError
 from risqlet.scoring import score_risks
 from risqlet.store import Store, StoreError, find_register, init_register
 from risqlet.validate import validate_register
+
+# Expected, user-facing errors: a bad register/config/pack should print a readable
+# `error: ...` and exit 1, not dump a traceback. Commands may also catch these
+# closer to the call; this is the backstop for the ones that do not.
+_CLEAN_CLI_ERRORS = (StoreError, CatalogError, PolicyError)
 
 
 def _add_common(parser: argparse.ArgumentParser) -> None:
@@ -863,7 +870,10 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except StoreError as exc:
+    except _CLEAN_CLI_ERRORS as exc:
+        # user-facing domain errors print `error: <msg>` and exit 1, never a
+        # traceback — e.g. a malformed user catalog/policy pack reaching a command
+        # that does not catch it itself (catalog list/show/search/licenses).
         print(f"error: {exc}", file=sys.stderr)
         return 1
 

@@ -21,6 +21,7 @@ from ruamel.yaml import YAML
 from risqlet.changeset import _components  # noqa: PLC2701 (shared path helper)
 from risqlet.ensemble import evidence_path
 from risqlet.guardrails.models import GuardrailTemplate, RenderedGuardrail
+from risqlet.guardrails.verify import UNSUPPORTED_ON_WINDOWS, _is_windows, is_shell_free
 from risqlet.model import Risk, Status
 from risqlet.store import Store
 
@@ -278,6 +279,30 @@ def verify_plan(plan: Plan, cwd: Path) -> list:
     return [verify_guardrail(g, cwd) for g in plan.guardrails if g.verify is not None]
 
 
+def _drop_windows_unrunnable_hooks(plan: Plan) -> tuple[Plan, list[dict]]:
+    """Remove claude-hooks that cannot run on Windows (POSIX shell), recording them.
+
+    Filtering the PLAN — rather than only refusing at write time — is what keeps
+    settings.json, the guardrails lock, and `guardrails diff` consistent: the lock is
+    written from this same filtered plan, so `diff` reports the dropped hook as
+    missing instead of falsely in-sync. Applies on every path (default / --no-verify
+    / --force) because a shell hook shelling out to bash/python3 genuinely cannot run
+    on Windows, and --force overrides a verification failure, not physics.
+    """
+    from dataclasses import replace
+
+    if not _is_windows():
+        return plan, []
+    kept, skips = [], []
+    for g in plan.guardrails:
+        if g.surface == "claude-hook" and g.command and not is_shell_free(g.command):
+            skips.append({"template_id": g.template_id, "forced": False,
+                          "failed": ["platform"], "detail": UNSUPPORTED_ON_WINDOWS})
+        else:
+            kept.append(g)
+    return replace(plan, guardrails=kept), skips
+
+
 def _gate_by_verification(plan: Plan, cwd: Path, force: bool) -> tuple[Plan, list[dict]]:
     """Drop hooks that fail verification (unless force). Returns (gated_plan, skips)."""
     from dataclasses import replace
@@ -311,8 +336,14 @@ def install_plan(store: Store, plan: Plan, target: str, root: Path,
         raise GuardrailError("guardrails must not be installed inside a .risqlet/ register")
 
     verify_skips: list[dict] = []
+    if target == "claude-project":
+        # refuse Windows-unrunnable shell hooks on every path (incl. --no-verify and
+        # --force), filtering the plan so the lock and `diff` stay consistent
+        plan, platform_skips = _drop_windows_unrunnable_hooks(plan)
+        verify_skips += platform_skips
     if verify and target in ("claude-project", "pre-commit"):
-        plan, verify_skips = _gate_by_verification(plan, root, force)
+        plan, gate_skips = _gate_by_verification(plan, root, force)
+        verify_skips += gate_skips
 
     if target in ("agents-md", "path", "pre-commit"):
         dest = (
@@ -352,6 +383,8 @@ def install_plan(store: Store, plan: Plan, target: str, root: Path,
 
 
 def _install_claude(root: Path, plan: Plan, force: bool) -> Path:
+    # Windows-unrunnable shell hooks are already removed from the plan by
+    # _drop_windows_unrunnable_hooks in install_plan, so nothing here writes one.
     settings = root / ".claude" / "settings.json"
     data = json.loads(settings.read_text(encoding="utf-8")) if settings.exists() else {}
     # remove any previously risqlet-managed hooks (command carries a marker comment)

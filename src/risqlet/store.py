@@ -12,9 +12,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 
 from risqlet.model import RISK_ID_PATTERN, Event  # noqa: F401  (pattern re-exported for callers)
-from risqlet.textio import read_text_tolerant
+from risqlet.textio import read_text_tolerant, yaml_detail
 
 RISQLET_DIR = ".risqlet"
 REGISTER_DIR = "register"
@@ -109,10 +110,24 @@ class Store:
     def config_path(self) -> Path:
         return self.root / CONFIG_FILE
 
+    def _load_yaml(self, path: Path):
+        """Parse a register YAML file, turning a malformed one into a StoreError.
+
+        Without this, ruamel's DuplicateKeyError (a YAMLError, not a StoreError)
+        escapes to the CLI, whose main() only catches StoreError — so `status`,
+        `check`, `score`, and `diff` printed a raw traceback on a bad config where
+        `validate` (which wraps the load itself) did not. Mirrors how read_events
+        already wraps a malformed events line.
+        """
+        try:
+            return self._yaml.load(read_text_tolerant(path))
+        except YAMLError as exc:
+            raise StoreError(f"{path}: {yaml_detail(exc)}") from exc
+
     def load_config_raw(self) -> dict:
         # tolerant: _STARTER_CONFIG carries an em-dash, so a pre-encoding-fix risqlet
         # on Windows wrote this file as cp1252. save_config_raw normalizes it.
-        return self._yaml.load(read_text_tolerant(self.config_path)) or {}
+        return self._load_yaml(self.config_path) or {}
 
     def save_config_raw(self, data: dict) -> None:
         buf = io.StringIO()
@@ -134,7 +149,7 @@ class Store:
         for path in self.risk_paths():
             # tolerant: risk statements carry the user's prose, so an old risqlet on
             # Windows wrote any non-ASCII one as cp1252. save_risk normalizes it.
-            data = self._yaml.load(read_text_tolerant(path))
+            data = self._load_yaml(path)
             out.append(RiskFile(path=path, data=data or {}))
         return out
 

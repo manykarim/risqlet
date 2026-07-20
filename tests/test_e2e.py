@@ -78,3 +78,64 @@ def test_full_workflow(tmp_path, capsys):
                                                                encoding="utf-8")
     assert main(["validate", "--dir", root]) == 1
     assert "human principal" in capsys.readouterr().out
+
+
+def test_malformed_config_fails_cleanly(tmp_path, capsys):
+    """A bad config.yaml must exit nonzero with a readable error, not a traceback.
+
+    `check` is the CI gate, so a raw traceback lands in users' CI logs. Regression
+    for the four commands (status, check, score, diff) that used to traceback where
+    only validate was clean.
+    """
+    root = str(tmp_path)
+    assert main(["init", "--dir", root]) == 0
+    capsys.readouterr()
+    cfg = tmp_path / ".risqlet" / "config.yaml"
+    cfg.write_text(cfg.read_text(encoding="utf-8") + "\nconstraints:\n  ci_gate: block\n",
+                   encoding="utf-8")  # duplicate top-level constraints key
+
+    for argv in (["status"], ["check", "--files", "x.py"], ["validate"]):
+        assert main([*argv, "--dir", root]) == 1, f"{argv[0]} should exit 1"
+        captured = capsys.readouterr()
+        combined = captured.out + captured.err
+        assert "Traceback" not in combined, f"{argv[0]} printed a traceback"
+        assert "error:" in combined.lower() and "duplicate key" in combined
+
+
+def test_malformed_user_policy_pack_fails_cleanly(tmp_path, capsys):
+    """A malformed user policy pack must not traceback either — same defect class as
+    the config, on a separate load path (policies/engine.py) the first fix missed.
+    The error surfaces when a risk actually needs the policy (score)."""
+    root = str(tmp_path)
+    assert main(["init", "--dir", root]) == 0
+    (tmp_path / ".risqlet" / "policies").mkdir()
+    (tmp_path / ".risqlet" / "policies" / "sod-ap-v1.yaml").write_text(
+        "id: sod-ap-v1\nfactors: {}\nfactors: {}\n", encoding="utf-8")  # duplicate key
+    (tmp_path / ".risqlet" / "register" / "R-0001.yaml").write_text(
+        "schema_version: 1\nid: R-0001\n"
+        "statement: Because tokens are logged, replay may occur, causing takeover\n"
+        "aspects: [iso25010.security]\n"
+        'elicited_by: {method: stride, evidence: ["src/a.py"]}\n'
+        "scores:\n  - policy: sod-ap-v1\n    values: {severity: 8, occurrence: 3, detection: 6}\n"
+        "    rubric_anchors: [s, o, d]\nstatus: proposed\nmitigations: []\n", encoding="utf-8")
+    capsys.readouterr()
+    assert main(["score", "--all", "--dir", root]) == 1
+    combined = "".join(capsys.readouterr())
+    assert "Traceback" not in combined
+    assert "duplicate key" in combined and "sod-ap-v1.yaml" in combined
+
+
+def test_malformed_user_catalog_pack_fails_cleanly(tmp_path, capsys):
+    """A malformed user catalog pack must not traceback — and this one hit `validate`,
+    contradicting the 'validate is clean' premise. Covers validate + catalog list."""
+    root = str(tmp_path)
+    assert main(["init", "--dir", root]) == 0
+    (tmp_path / ".risqlet" / "catalogs").mkdir()
+    (tmp_path / ".risqlet" / "catalogs" / "iso25010.yaml").write_text(
+        "id: iso25010\nentries: []\nentries: []\n", encoding="utf-8")  # duplicate key
+    capsys.readouterr()
+    for argv in (["validate"], ["catalog", "list"]):
+        assert main([*argv, "--dir", root]) == 1, f"{argv} should exit 1"
+        combined = "".join(capsys.readouterr())
+        assert "Traceback" not in combined, f"{argv} printed a traceback"
+        assert "duplicate key" in combined and "iso25010.yaml" in combined
