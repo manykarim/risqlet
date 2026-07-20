@@ -7,6 +7,15 @@ All notable changes to risqlet are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **`diff`/`check` no longer false-flag a risk on a same-named file in a different
+  directory.** The change→risk matcher treated bare-basename equality as a same-file
+  match, so evidence `src/connection/mod.rs` matched *any* changed `mod.rs`
+  (`locator/mod.rs`, `python/mod.rs`) at HIGH confidence — moving the CI gate on
+  unrelated changes. This hit hardest on the polyglot repos risqlet targets, where
+  `mod.rs` (Rust), `__init__.py` (Python), and `index.ts` (TS) are everywhere. A
+  same-file match across differing roots now requires the parent directory to match
+  too (a component-wise path suffix of ≥2 components); the legitimate
+  same-file-different-root case and exact/directory matches are unchanged.
 - **A malformed user-editable YAML file no longer prints a raw traceback.** A
   duplicate key (or other parse error) in `config.yaml`, a `register/*.yaml` risk, a
   user **policy** pack (`.risqlet/policies/`), or a user **catalog** pack

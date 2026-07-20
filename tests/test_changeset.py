@@ -60,6 +60,40 @@ class TestDiff:
         report = build_diff(store, files=["src/orders/saga.py"])
         assert report["touched"] and report["touched"][0]["risk"] == "R-0001"
 
+    def test_basename_collision_not_matched(self, store):
+        """A ubiquitous basename must not false-match across directories.
+
+        Bug: `_path_match` used bare-basename equality, so evidence
+        `src/connection/mod.rs` HIGH-matched any changed `mod.rs`
+        (`locator/mod.rs`, `python/mod.rs`) — false HIGH-confidence flags in the CI
+        gate, worst on the polyglot repos (Rust mod.rs, Python __init__.py) risqlet
+        targets. Now the parent directory must match too.
+        """
+        write_risk(store, "R-0001", evidence='"src/connection/mod.rs"')
+        report = build_diff(store, files=["src/locator/mod.rs", "src/python/mod.rs"])
+        assert report["touched"] == []  # neither shares connection/'s parent dir
+
+    def test_init_py_collision_not_matched(self, store):
+        write_risk(store, "R-0001", evidence='"pkg/auth/__init__.py"')
+        report = build_diff(store, files=["pkg/billing/__init__.py"])
+        assert report["touched"] == []
+
+    def test_same_file_different_root_still_matches(self, store):
+        """The legitimate reason basename matching existed — evidence and git
+        reporting the same file at different roots — must still match at HIGH."""
+        write_risk(store, "R-0001", evidence='"connection/mod.rs"')
+        report = build_diff(store, files=["src/connection/mod.rs"])
+        assert report["touched"] and report["touched"][0]["risk"] == "R-0001"
+        assert report["touched"][0]["confidence"] == "high"
+
+    def test_collision_still_matches_the_real_file(self, store):
+        """Fixing the collision must not lose the true positive: the actual
+        connection/mod.rs change is still flagged even amid decoy mod.rs files."""
+        write_risk(store, "R-0001", evidence='"src/connection/mod.rs"')
+        report = build_diff(store, files=["src/locator/mod.rs", "src/connection/mod.rs"])
+        assert [t["risk"] for t in report["touched"]] == ["R-0001"]
+        assert report["touched"][0]["confidence"] == "high"
+
     def test_test_ref_match(self, store):
         write_risk(store, "R-0001", evidence='"docs/x.md"',
                    mitigations='[{id: M-0001, risk_ids: [R-0001], treatment: reduce, '

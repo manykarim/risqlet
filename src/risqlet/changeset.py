@@ -77,7 +77,7 @@ def _components(path: str) -> list[str]:
 
 
 def _path_match(reference: str, changed: str) -> str | None:
-    """Return 'file' for exact/basename path match, 'dir' for a directory-prefix
+    """Return 'file' for an exact/same-file path match, 'dir' for a directory-prefix
     signal, else None."""
     if not reference:
         return None
@@ -86,9 +86,15 @@ def _path_match(reference: str, changed: str) -> str | None:
         return "file"
     ref_parts = _components(ref)
     changed_parts = _components(changed)
-    # basename equality (same file, different roots)
-    if ref_parts and changed_parts and ref_parts[-1] == changed_parts[-1] and "." in ref_parts[-1]:
-        return "file"
+    # Same file under a different root: the shorter path must be a component-wise
+    # SUFFIX of the longer, sharing the file AND its parent directory (>= 2
+    # components). Bare-basename equality is NOT enough — mod.rs / __init__.py /
+    # index.ts are ubiquitous, so evidence "connection/mod.rs" must not match a
+    # changed "locator/mod.rs" (which would be a false HIGH-confidence flag).
+    if ref_parts and changed_parts and "." in ref_parts[-1]:
+        short, long = sorted((ref_parts, changed_parts), key=len)
+        if len(short) >= 2 and long[-len(short):] == short:
+            return "file"
     # directory prefix: evidence points at a dir containing the changed file
     if reference.endswith("/") or "." not in ref_parts[-1]:
         if changed_parts[: len(ref_parts)] == ref_parts:
