@@ -7,6 +7,32 @@ All notable changes to risqlet are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **A malformed user-editable YAML file no longer prints a raw traceback.** A
+  duplicate key (or other parse error) in `config.yaml`, a `register/*.yaml` risk, a
+  user **policy** pack (`.risqlet/policies/`), or a user **catalog** pack
+  (`.risqlet/catalogs/`) raised ruamel's `YAMLError`, which the CLI did not catch —
+  so `status`, `check`, `score`, `diff`, `validate`, and `catalog list` dumped a
+  traceback. `check` is the CI gate, so it landed in users' CI logs. Every
+  user-editable YAML load now wraps a parse error as the layer's domain error
+  (`StoreError` / `PolicyError` / `CatalogError`) with the file path and the concise
+  reason (e.g. `found duplicate key "constraints" (line 20)`), and the CLI treats all
+  three as clean errors — so these commands exit 1 with a readable message. Non-YAML
+  errors still propagate, and reads of shipped package data are unaffected.
+
+### Changed
+- **`guardrails install` refuses a POSIX shell hook on Windows on every path, not
+  just the default one.** The refusal (shell hooks can't run on Windows — they shell
+  out to bash/python3) previously lived only in the verify gate, so `--no-verify`
+  silently wrote a non-runnable hook into `settings.json` and `--force` wrote it with
+  only a warning. The unrunnable hooks are now removed from the plan before install,
+  so a hook that cannot run never lands on any path (default / `--no-verify` /
+  `--force`); the install degrades to permissions-only, with the skip reported.
+  Platform-impossibility is not forceable — `--force` still overrides an ordinary
+  verification failure, but cannot will a shell hook into working on Windows. Because
+  the guardrails lock is written from the same filtered plan, `guardrails diff` now
+  correctly reports a refused hook as missing rather than falsely in-sync.
+
+### Fixed
 - **`risqlet setup` no longer crashes on a `CLAUDE.md` that an older risqlet wrote.**
   Making reads strict UTF-8 was right for what risqlet writes from now on and wrong
   for what was already on disk — including files risqlet itself wrote in cp1252

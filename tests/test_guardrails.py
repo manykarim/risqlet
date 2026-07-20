@@ -180,16 +180,24 @@ class TestInstallAndDiff:
         assert "# My project rules" in agents and "Do the thing." in agents
         assert "risqlet:guardrails:begin" in agents
 
-    def test_claude_settings_merge(self, store, tmp_path):
+    def test_claude_settings_writes_permission_deny(self, store, tmp_path):
+        # cross-platform: the permission guardrail is written on every OS
+        add_risk(store)
+        _install_claude(tmp_path, build_plan(store), force=False)
+        settings = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        assert any(str(d).startswith("Read(**/.env") for d in settings["permissions"]["deny"])
+
+    @pytest.mark.posix_only  # the bundled hooks are POSIX shell; refused on Windows
+    def test_claude_settings_writes_shell_hook(self, store, tmp_path):
         add_risk(store)
         _install_claude(tmp_path, build_plan(store), force=False)
         settings = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
         assert "hooks" in settings
         assert any("# risqlet:" in h["command"]
                    for e in settings["hooks"]["PostToolUse"] for h in e["hooks"])
-        assert any(str(d).startswith("Read(**/.env") for d in settings["permissions"]["deny"])
 
-    def test_claude_reinstall_replaces_managed_only(self, store, tmp_path):
+    def test_claude_reinstall_preserves_user_hook(self, store, tmp_path):
+        # cross-platform: a user's own hook is never touched, however many installs
         add_risk(store)
         settings_dir = tmp_path / ".claude"
         settings_dir.mkdir()
@@ -202,7 +210,61 @@ class TestInstallAndDiff:
         settings = json.loads((settings_dir / "settings.json").read_text(encoding="utf-8"))
         cmds = [h["command"] for e in settings["hooks"]["PostToolUse"] for h in e["hooks"]]
         assert "my-own-hook" in cmds  # user hook preserved
+
+    @pytest.mark.posix_only  # the managed shell hook is not written on Windows
+    def test_claude_reinstall_does_not_duplicate_managed_hook(self, store, tmp_path):
+        add_risk(store)
+        settings_dir = tmp_path / ".claude"
+        settings_dir.mkdir()
+        (settings_dir / "settings.json").write_text(json.dumps({
+            "hooks": {"PostToolUse": [{"matcher": "Write",
+                      "hooks": [{"type": "command", "command": "my-own-hook"}]}]}}),
+                          encoding="utf-8")
+        _install_claude(tmp_path, build_plan(store), force=False)
+        _install_claude(tmp_path, build_plan(store), force=False)  # twice
+        settings = json.loads((settings_dir / "settings.json").read_text(encoding="utf-8"))
+        cmds = [h["command"] for e in settings["hooks"]["PostToolUse"] for h in e["hooks"]]
         assert sum("# risqlet:" in c for c in cmds) == 1  # managed hook not duplicated
+
+    def test_windows_no_verify_does_not_write_shell_hook(self, store, tmp_path, monkeypatch):
+        """The behavior change (user-approved): --no-verify used to slip a POSIX shell
+        hook — which shells out to bash/python3, absent on Windows — into Windows
+        settings.json with no warning. The write-time guard in _install_claude closes
+        that escape hatch. Simulated Windows so it runs on every OS; the real-Windows
+        counterpart is test_hook_verification.py::TestWindowsRefusal."""
+        add_risk(store)
+        monkeypatch.setattr("risqlet.guardrails.engine._is_windows", lambda: True)
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        res = install_plan(store, build_plan(store), "claude-project", proj, verify=False)
+        settings = json.loads((proj / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        cmds = [h["command"] for e in settings.get("hooks", {}).get("PostToolUse", [])
+                for h in e["hooks"]]
+        assert not any("# risqlet:" in c for c in cmds)  # no non-runnable hook landed
+        assert any(s["failed"] == ["platform"] for s in res["verify_skipped"])  # and reported
+        assert any(str(d).startswith("Read(**/.env")  # permissions still degrade honestly
+                   for d in settings["permissions"]["deny"])
+        # the lock is written from the same filtered plan, so `diff` must report the
+        # dropped hook as missing — not falsely in-sync (the reviewer's finding)
+        d = diff_target(store, proj)
+        assert any("secret-scan-posttool" in m for m in d["missing"])
+
+    def test_windows_force_cannot_override_platform(self, store, tmp_path, monkeypatch):
+        """--force overrides a verification failure, but not platform impossibility:
+        a shell hook still cannot run on Windows, so force must not write it."""
+        add_risk(store)
+        monkeypatch.setattr("risqlet.guardrails.engine._is_windows", lambda: True)
+        monkeypatch.setattr("risqlet.guardrails.verify._is_windows", lambda: True)
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        res = install_plan(store, build_plan(store), "claude-project", proj, force=True)
+        settings = json.loads((proj / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        cmds = [h["command"] for e in settings.get("hooks", {}).get("PostToolUse", [])
+                for h in e["hooks"]]
+        assert not any("# risqlet:" in c for c in cmds)  # force did NOT write it
+        # the platform skip must NOT be marked forced — force didn't override it
+        plat = [s for s in res["verify_skipped"] if s["failed"] == ["platform"]]
+        assert plat and plat[0]["forced"] is False
 
     def test_overwrite_protection_path_target(self, store, tmp_path):
         # a standalone bundle file (path target) with foreign content is protected

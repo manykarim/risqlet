@@ -1,6 +1,7 @@
 """Tests for guardrail hook verification and the verify-by-default install gate."""
 
 import json
+import os
 import shutil
 
 import pytest
@@ -188,6 +189,44 @@ def store_with_secret_risk(tmp_path):
     store = Store(init_register(tmp_path, "demo"))
     (store.register_dir / "R-0001.yaml").write_text(ACCEPTED_SECRET_RISK, encoding="utf-8")
     return store
+
+
+@pytest.mark.skipif(os.name != "nt", reason="asserts the Windows-native refusal path")
+class TestWindowsRefusal:
+    """Proof, on a REAL Windows runner, that guardrails install degrades honestly.
+
+    The product deliberately refuses POSIX shell hooks on Windows — there is nothing
+    to execute, so this asserts the refusal, not execution. Not posix_only (it must
+    RUN on the windows-latest leg); skipped with a reason on Linux/macOS. Drives the
+    `--no-verify` path deliberately: the default path was already honest before the
+    write-time refusal, so only --no-verify (and the lock/diff consistency) actually
+    exercises the new code. Real os.name=='nt' closes what the simulated-Windows
+    tests in test_guardrails.py cannot: WindowsPath and PATHEXT through the flow."""
+
+    def test_no_verify_still_refuses_and_stays_consistent(self, store_with_secret_risk,
+                                                          tmp_path):
+        from risqlet.guardrails import diff_target
+
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        # --no-verify bypasses the gate; the shell hook must STILL be refused here
+        res = install_plan(store_with_secret_risk, build_plan(store_with_secret_risk),
+                           "claude-project", proj, verify=False)  # must not raise
+        skipped = {s["template_id"]: s for s in res["verify_skipped"]}
+        assert "secret-scan-posttool" in skipped
+        assert skipped["secret-scan-posttool"]["failed"] == ["platform"]
+        assert "not supported on Windows" in skipped["secret-scan-posttool"]["detail"]
+
+        settings = json.loads((proj / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        cmds = [h["command"] for e in settings.get("hooks", {}).get("PostToolUse", [])
+                for h in e["hooks"]]
+        assert not any("# risqlet:" in c for c in cmds)  # no non-runnable hook written
+        assert settings["permissions"]["deny"]  # degrades to permissions-only
+
+        # the lock must match reality: `diff` reports the dropped hook as missing,
+        # not falsely "in sync" (the regression the reviewer found)
+        d = diff_target(store_with_secret_risk, proj)
+        assert any("secret-scan-posttool" in m for m in d["missing"])
 
 
 @pytest.mark.posix_only

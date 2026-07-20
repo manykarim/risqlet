@@ -15,6 +15,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
+
+from risqlet.textio import read_text_tolerant, yaml_detail
 
 PACKS_DIR = Path(__file__).resolve().parent / "packs"
 
@@ -205,8 +208,12 @@ def load_policy(policy_id: str, user_dir: Path | None = None) -> Policy:
     yaml = YAML(typ="safe")
     for path in candidates:
         if path.is_file():
-            with path.open(encoding="utf-8") as f:
-                data = yaml.load(f)
+            try:
+                data = yaml.load(read_text_tolerant(path))
+            except YAMLError as exc:
+                # a user's pack shadows a shipped id; a malformed one must be a
+                # PolicyError (which callers catch), not a raw ruamel traceback
+                raise PolicyError(f"{path}: {yaml_detail(exc)}") from exc
             policy = Policy.from_dict(data, source=str(path))
             if policy.id != policy_id:
                 raise PolicyError(f"{path}: pack id {policy.id!r} does not match {policy_id!r}")

@@ -12,9 +12,11 @@ from pathlib import Path
 
 from pydantic import ValidationError
 from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 
 from risqlet.catalog.models import CatalogEntry, CatalogPack
 from risqlet.store import Store
+from risqlet.textio import read_text_tolerant, yaml_detail
 
 PACKS_DIR = Path(__file__).resolve().parent / "packs"
 USER_CATALOGS_DIR = "catalogs"
@@ -43,8 +45,13 @@ def load_pack(pack_id: str, store: Store | None = None) -> CatalogPack:
     yaml = YAML(typ="safe")
     for path in candidates:
         if path.is_file():
-            with path.open(encoding="utf-8") as f:
-                data = yaml.load(f)
+            try:
+                data = yaml.load(read_text_tolerant(path))
+            except YAMLError as exc:
+                # a user's catalog shadows a shipped id (e.g. iso25010); a malformed
+                # one must be a CatalogError, not a raw traceback — even `validate`
+                # tracebacked here, contradicting "validate is clean"
+                raise CatalogError(f"{path}: {yaml_detail(exc)}") from exc
             try:
                 pack = CatalogPack.model_validate(data)
             except ValidationError as exc:

@@ -246,6 +246,57 @@ class TestCleanInstall:
         r = run_installed(clean_install, "validate", "--dir", str(proj))
         assert r.returncode == 0, r.stderr
 
+    # -- the upgrade path: reading files an OLDER risqlet left on disk ---------
+    # This is the gap that let two Windows bugs through: every other test starts
+    # from a clean checkout, so nothing exercises a file a previous version wrote.
+    # An older risqlet on a cp1252 host (Windows) wrote these files in cp1252 —
+    # reproduced here as a fixture, driven through the SHIPPED console script, so the
+    # assertion runs on the real platform (Linux, macOS, and the real Windows leg).
+    LEGACY_PROSE = "# House rules\n\nBe careful — the café costs €5.\n"
+
+    def test_legacy_cp1252_claude_md_heals_through_the_wheel(self, clean_install):
+        """A CLAUDE.md an older risqlet wrote in cp1252 must load, heal to UTF-8, and
+        keep the user's content — proven through the installed wheel on this OS."""
+        proj = clean_install.work / "legacy-md"
+        proj.mkdir(exist_ok=True)
+        md = proj / "CLAUDE.md"
+        md.write_bytes(self.LEGACY_PROSE.encode("cp1252"))
+        assert b"\x97" in md.read_bytes()  # cp1252 em-dash — guard against a vacuous test
+
+        r = run_installed(clean_install, "setup", "--agents", "claude",
+                          "--components", "instructions", "--yes", "--dir", str(proj))
+        assert r.returncode == 0, r.stderr
+        assert "utf-8" in r.stderr.lower(), "recovery should be reported on stderr"
+
+        text = md.read_bytes().decode("utf-8")  # raises if still cp1252 == not healed
+        assert b"\x97" not in md.read_bytes()
+        assert "Be careful — the café costs €5." in text  # content survived
+        assert "�" not in text  # not errors="replace" — nothing mangled
+        assert "risqlet:setup:begin" in text  # the merge actually happened
+
+    def test_legacy_cp1252_register_loads_through_the_wheel(self, clean_install):
+        """A register YAML an older risqlet wrote in cp1252 must load through the
+        shipped CLI without a crash, with the statement text intact."""
+        proj = clean_install.work / "legacy-reg"
+        proj.mkdir(exist_ok=True)
+        assert run_installed(clean_install, "init", "--dir", str(proj)).returncode == 0
+        risk = (
+            "schema_version: 1\nid: R-0001\n"
+            "statement: Because the flow reverts — divergence may occur, causing loss\n"
+            "aspects: [iso25010.reliability]\n"
+            'elicited_by: {method: inside-out, evidence: ["src/a.py"]}\n'
+            "scores: []\nstatus: proposed\nmitigations: []\n"
+        )
+        rf = proj / ".risqlet" / "register" / "R-0001.yaml"
+        rf.write_bytes(risk.encode("cp1252"))
+        assert b"\x97" in rf.read_bytes()
+
+        r = run_installed(clean_install, "validate", "--dir", str(proj))
+        assert r.returncode == 0, r.stderr  # reads the cp1252 register, no traceback
+        assert "Traceback" not in r.stderr
+        r2 = run_installed(clean_install, "status", "--dir", str(proj), "--json")
+        assert r2.returncode == 0, r2.stderr
+
     @pytest.mark.parametrize("agent", sorted(ADAPTER_IDS))
     def test_every_adapter_sets_up_from_the_wheel(self, clean_install, agent):
         """spec: cross-platform-support — agent setup is smoke-tested per platform.
