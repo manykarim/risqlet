@@ -43,4 +43,10 @@ text, crediting the following as the origin of the ideas (never their wording):
   - The pre-mortem method (Gary Klein).
   - Second-order "testing traps" framing (Lena Pejgan Wiberg).
 
+The adversarial-review verdict (`risqlet review`, the `risk-court` skill) is a
+clean-room reimplementation from the observed behavior of agentic-qe's "QE Court"
+referee (https://github.com/proffesor-for-testing/agentic-qe, MIT). No source was
+copied; the SHIP/REMAND/BLOCK rules were derived from behavior and are specified in
+this project's openspec change `add-adversarial-review`.
+
 See CLEAN-ROOM.md for the authoring protocol and per-entry provenance.

@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "risqlet adversarial-review charges",
+  "description": "A review panel's charges against one decision, consumed by `risqlet review`.",
+  "type": "object",
+  "required": ["decision", "reviews"],
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "type": "string",
+      "description": "The reviewed decision id (e.g. a risk id R-0003)."
+    },
+    "author": {
+      "type": "string",
+      "description": "Id of whoever made the decision; excluded from the panel."
+    },
+    "reviews": {
+      "type": "array",
+      "minItems": 2,
+      "description": "One entry per reviewer. Distinct reviewer ids; the author is not among them.",
+      "items": {
+        "type": "object",
+        "required": ["reviewer", "charges"],
+        "additionalProperties": false,
+        "properties": {
+          "reviewer": {
+            "type": "string",
+            "description": "Independent reviewer id (a reviewer with no charges is a clean vote)."
+          },
+          "charges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["category", "severity", "reproducible"],
+              "additionalProperties": false,
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "description": "Short slug, e.g. hollow-mitigation-test, evidence-mismatch, wrong-priority."
+                },
+                "severity": { "enum": ["fatal", "major", "minor"] },
+                "reproducible": {
+                  "type": "boolean",
+                  "description": "true only if verified against the actual code/evidence; false charges do not count toward the verdict."
+                },
+                "claim": {
+                  "type": "string",
+                  "description": "The specific objection, grounded in the real file."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

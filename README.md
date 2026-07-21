@@ -118,6 +118,15 @@ Two portable playbooks (cross-vendor Agent Skills format) ship in `skills/`:
   register's event log.
 - **risk-quickscan** — a diff/PR-scoped single-pass scan that adds `proposed`
   risks and recommends a full session when warranted.
+- **risk-court** — a targeted adversarial review of one high-stakes decision: the
+  host convenes an independent panel to challenge it against the actual code, and
+  `risqlet review` computes a deterministic SHIP/REMAND/BLOCK verdict from their
+  charges (a category counts only when ≥2 distinct reviewers corroborate it). The
+  verdict is *advisory* — recorded to `.risqlet/reviews.jsonl`, re-checked by
+  `validate`, but never transitioning a risk; a human still decides. The host runs
+  the reviewers; risqlet does the arithmetic and calls no model. Scope: an
+  accept/sign-off/phase gate, not every `proposed` risk. Small evidence base so far —
+  the mechanism is shipped, not a claim of universal accuracy.
 
 Install them where your agent looks:
 

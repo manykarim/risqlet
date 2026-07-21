@@ -310,4 +310,33 @@ def validate_register(store: Store) -> ValidationReport:
     if config is not None:
         findings.extend(lifecycle.check_phase_consistency(str(config.phase), events))
 
+    # recorded review verdicts must recompute from their own charges (like ensemble
+    # disagreement) — a tampered or stale verdict is caught
+    findings.extend(_check_reviews(store))
+
     return ValidationReport(findings)
+
+
+def _check_reviews(store: Store) -> list[Finding]:
+    from risqlet.review import ReviewError, compute_verdict, read_reviews, reviews_path
+
+    out: list[Finding] = []
+    label = str(reviews_path(store))
+    try:
+        records = read_reviews(store)
+    except ReviewError as exc:
+        return [Finding(Severity.ERROR, label, "reviews", str(exc))]
+    for i, rec in enumerate(records):
+        try:
+            recomputed = compute_verdict(rec.get("author", ""), rec.get("reviews") or [])
+        except ReviewError as exc:
+            out.append(Finding(Severity.ERROR, label, f"reviews[{i}]",
+                               f"{rec.get('decision', '?')}: invalid recorded review: {exc}"))
+            continue
+        if (recomputed["verdict"] != rec.get("verdict")
+                or recomputed["surviving"] != rec.get("surviving")):
+            out.append(Finding(
+                Severity.ERROR, label, f"reviews[{i}]",
+                f"{rec.get('decision', '?')}: recorded verdict {rec.get('verdict')!r} "
+                f"does not match recomputed {recomputed['verdict']!r}"))
+    return out
