@@ -15,7 +15,7 @@ CATALOG_ID_RE = re.compile(
     r"\.[a-z0-9][a-z0-9-]*\b")
 RISQLET_CMD_RE = re.compile(r"\brisqlet\s+([a-z-]+)")
 
-LINE_BUDGETS = {"risk-analysis": 200, "risk-quickscan": 150}
+LINE_BUDGETS = {"risk-analysis": 200, "risk-quickscan": 150, "risk-court": 120}
 
 
 def all_skill_markdown():
@@ -24,9 +24,9 @@ def all_skill_markdown():
 
 
 class TestDriftGuards:
-    def test_both_skills_discovered(self):
+    def test_skills_discovered(self):
         names = [s.name for s in list_skills()]
-        assert names == ["risk-analysis", "risk-quickscan"]
+        assert names == ["risk-analysis", "risk-court", "risk-quickscan"]
 
     def test_frontmatter_name_matches_directory(self):
         for skill in list_skills():
@@ -78,7 +78,8 @@ class TestSkillsCli:
         monkeypatch.chdir(tmp_path)
         assert main(["skills", "list", "--json"]) == 0
         payload = json.loads(capsys.readouterr().out)
-        assert {s["name"] for s in payload["skills"]} == {"risk-analysis", "risk-quickscan"}
+        assert {s["name"] for s in payload["skills"]} == {
+            "risk-analysis", "risk-quickscan", "risk-court"}
 
     def test_install_project_target(self, tmp_path, monkeypatch, capsys):
         monkeypatch.chdir(tmp_path)

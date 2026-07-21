@@ -6,6 +6,21 @@ All notable changes to risqlet are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Adversarial review (`risqlet review`) — a deterministic SHIP/REMAND/BLOCK verdict
+  over a host-run review panel.** `validate` checks structure and cannot see that a
+  schema-valid decision is semantically wrong (a risk accepted on a hollow mitigation
+  test, evidence pointing at an unrelated file, a critical defect scored low). The new
+  `risk-court` skill directs the host to convene an independent panel that challenges a
+  named decision against the actual code and emits structured charges; `risqlet review`
+  validates the panel (≥2 distinct reviewers, author excluded) and computes a verdict —
+  a category counts only when ≥2 **distinct** reviewers corroborate it. The verdict is
+  advisory: it is recorded to an append-only `.risqlet/reviews.jsonl` and re-checked by
+  `validate`, but only a human-principal event moves a risk's lifecycle. Framework-
+  provider throughout: the host runs the reviewers, risqlet does the arithmetic and calls
+  no model. Reimplemented clean-room from agentic-qe's (MIT) QE-Court behavior. In a
+  measured trial it caught 3/3 planted weaknesses that `validate` passed (0/3).
+
 ### Fixed
 - **`diff`/`check` no longer false-flag a risk on a same-named file in a different
   directory.** The change→risk matcher treated bare-basename equality as a same-file

@@ -27,7 +27,7 @@ from risqlet.setup.models import (
 
 ADAPTERS_DIR = Path(__file__).resolve().parent / "adapters"
 MANIFEST_NAME = "agents.lock"
-SKILL_NAMES = ["risk-analysis", "risk-quickscan"]
+SKILL_NAMES = ["risk-analysis", "risk-quickscan", "risk-court"]
 
 
 class SetupError(Exception):

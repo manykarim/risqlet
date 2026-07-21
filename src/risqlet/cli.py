@@ -11,6 +11,7 @@ from risqlet.catalog.loader import CatalogError
 from risqlet.exports.renderers import FORMATS, ExportError, render
 from risqlet.findings import Finding
 from risqlet.policies.engine import PolicyError
+from risqlet.review import ReviewError
 from risqlet.scoring import score_risks
 from risqlet.store import Store, StoreError, find_register, init_register
 from risqlet.validate import validate_register
@@ -18,7 +19,7 @@ from risqlet.validate import validate_register
 # Expected, user-facing errors: a bad register/config/pack should print a readable
 # `error: ...` and exit 1, not dump a traceback. Commands may also catch these
 # closer to the call; this is the backstop for the ones that do not.
-_CLEAN_CLI_ERRORS = (StoreError, CatalogError, PolicyError)
+_CLEAN_CLI_ERRORS = (StoreError, CatalogError, PolicyError, ReviewError)
 
 
 def _add_common(parser: argparse.ArgumentParser) -> None:
@@ -393,6 +394,41 @@ def _cmd_check_hook(args) -> int:
     return 0
 
 
+def cmd_review(args) -> int:
+    """Compute and record a deterministic verdict over a review panel's charges.
+
+    Advisory: it never changes a risk's status (only a human-principal event does).
+    The exit code is a CI signal, not a state change — 0 for SHIP, 1 for
+    REMAND/BLOCK — so a panel's finding can gate a pipeline without transitioning
+    the register.
+    """
+    from risqlet.review import ReviewError, record_review
+
+    raw = sys.stdin.read() if args.stdin else args.charges.read_text(encoding="utf-8")
+    try:
+        payload = json.loads(raw)
+    except (ValueError, TypeError) as exc:
+        raise ReviewError(f"charges must be valid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ReviewError("charges JSON must be an object with a 'reviews' list")
+    decision = args.decision or payload.get("decision")
+    if not decision:
+        raise ReviewError("give the reviewed decision via --decision or a 'decision' field")
+    author = args.author if args.author is not None else payload.get("author", "")
+    reviews = payload.get("reviews")
+    if not isinstance(reviews, list):
+        raise ReviewError("charges JSON needs a 'reviews' list")
+
+    record = record_review(_store(args), decision, author, reviews)  # raises ReviewError
+    if args.json:
+        print(json.dumps(record, indent=2))
+    else:
+        print(f"{record['verdict']}  {decision}"
+              + (f"  (surviving: {', '.join(record['surviving'])})"
+                 if record["surviving"] else ""))
+    return 0 if record["verdict"] == "SHIP" else 1
+
+
 def cmd_ci_init(args) -> int:
     from risqlet.ci import CIError, init
 
@@ -750,6 +786,22 @@ def build_parser() -> argparse.ArgumentParser:
                               "reports only, always exits 0")
     _add_common(p_check)
     p_check.set_defaults(func=cmd_check)
+
+    p_review = sub.add_parser(
+        "review", help="compute a deterministic SHIP/REMAND/BLOCK verdict over an "
+                       "adversarial review panel's charges (advisory; human decides)"
+    )
+    p_review.add_argument("--charges", type=Path, default=None,
+                          help="JSON file of the panel's charges "
+                               "({decision, author, reviews:[{reviewer, charges}]})")
+    p_review.add_argument("--stdin", action="store_true",
+                          help="read the charges JSON from stdin instead of --charges")
+    p_review.add_argument("--decision", default=None,
+                          help="reviewed decision id (overrides the file's 'decision')")
+    p_review.add_argument("--author", default=None,
+                          help="decision author id, excluded from the panel")
+    _add_common(p_review)
+    p_review.set_defaults(func=cmd_review)
 
     p_ci = sub.add_parser("ci", help="emit CI / hooks templates for continuous re-assessment")
     ci_sub = p_ci.add_subparsers(dest="ci_command", required=True)
