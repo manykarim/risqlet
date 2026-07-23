@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from risqlet import __version__
 from risqlet.catalog.loader import CatalogError
 from risqlet.exports.renderers import FORMATS, ExportError, render
 from risqlet.findings import Finding
@@ -677,6 +678,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Repo-native risk register with a deterministic core. "
                     "State lives in .risqlet/; semantic analysis stays with your agent.",
     )
+    parser.add_argument("--version", action="version", version=f"risqlet {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_init = sub.add_parser("init", help="scaffold a .risqlet/ register")
