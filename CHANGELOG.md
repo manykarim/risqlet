@@ -6,6 +6,8 @@ All notable changes to risqlet are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-21
+
 ### Added
 - **Adversarial review (`risqlet review`) — a deterministic SHIP/REMAND/BLOCK verdict
   over a host-run review panel.** `validate` checks structure and cannot see that a
@@ -20,6 +22,53 @@ All notable changes to risqlet are documented here. The format follows
   provider throughout: the host runs the reviewers, risqlet does the arithmetic and calls
   no model. Reimplemented clean-room from agentic-qe's (MIT) QE-Court behavior. In a
   measured trial it caught 3/3 planted weaknesses that `validate` passed (0/3).
+- **Cross-platform CI.** The `test` workflow now runs the full suite on Linux,
+  macOS, and Windows on every push and PR. Each platform also builds the wheel,
+  installs it into a fresh venv with no dev dependencies, and drives the real
+  `risqlet` console script from outside the repo — the first check of the artifact
+  users actually get, rather than the editable source install every test used
+  before. `risqlet setup` is smoke-tested for every agent adapter on every platform.
+  Platform differences are `posix_only` skips *inside* the suite, so they are
+  visible with a stated reason rather than omitted from a per-OS test selection.
+- Supported operating systems are now declared in `pyproject.toml` classifiers, and
+  a test ties them to the CI matrix — dropping a platform from CI fails that test
+  instead of leaving a stale promise on PyPI.
+- `risqlet --version` reports the installed version (it previously fell through to a
+  usage error), and a test pins `pyproject.toml`'s version to `risqlet.__version__`
+  so the two can no longer drift — `__version__` is recorded in every
+  `.risqlet/agents.lock` manifest.
+- `risqlet check --hook-input claude` reads a Claude Code hook payload from stdin
+  and checks the file it names. Distinct from `--stdin` (newline-separated paths),
+  which is unchanged. Because it runs inside an agent's edit loop it reports only
+  and always exits 0 — a malformed payload or an internal error is a silent no-op,
+  and `ci_gate: block` does not fail the edit. The gate's blocking behaviour is
+  unchanged for CI use.
+
+### Changed
+- **`guardrails install` refuses a POSIX shell hook on Windows on every path, not
+  just the default one.** The refusal (shell hooks can't run on Windows — they shell
+  out to bash/python3) previously lived only in the verify gate, so `--no-verify`
+  silently wrote a non-runnable hook into `settings.json` and `--force` wrote it with
+  only a warning. The unrunnable hooks are now removed from the plan before install,
+  so a hook that cannot run never lands on any path (default / `--no-verify` /
+  `--force`); the install degrades to permissions-only, with the skip reported.
+  Platform-impossibility is not forceable — `--force` still overrides an ordinary
+  verification failure, but cannot will a shell hook into working on Windows. Because
+  the guardrails lock is written from the same filtered plan, `guardrails diff` now
+  correctly reports a refused hook as missing rather than falsely in-sync.
+- The release workflow is now **manually dispatched and mode-selectable**: a tag
+  push no longer publishes anything. Dispatching `release` with a tag and a mode
+  produces a draft GitHub release, a published GitHub release, or a full PyPI
+  publish — every mode builds, tests, and attaches the sdist + wheel to the
+  GitHub release. PyPI auth moved from Trusted Publishing (OIDC) to an API-token
+  secret (`PYPI_API_TOKEN`); the `pypi` mode fails fast until the secret is set.
+- Guardrail hooks are now **verified in the target environment** before install
+  (required tools on PATH, shell syntax, benign-passes/violation-caught behaviour,
+  timeout) and install is gated by default (`--no-verify` / `--force` to override);
+  new `risqlet guardrails verify`. Installed Claude Code hooks now carry the
+  **real** command (previously a `true` placeholder) and read the changed file
+  from Claude's stdin JSON payload. `coverage-check-stop` derives the project's
+  test command instead of hardcoding `make test`.
 
 ### Fixed
 - **`diff`/`check` no longer false-flag a risk on a same-named file in a different
@@ -42,21 +91,6 @@ All notable changes to risqlet are documented here. The format follows
   reason (e.g. `found duplicate key "constraints" (line 20)`), and the CLI treats all
   three as clean errors — so these commands exit 1 with a readable message. Non-YAML
   errors still propagate, and reads of shipped package data are unaffected.
-
-### Changed
-- **`guardrails install` refuses a POSIX shell hook on Windows on every path, not
-  just the default one.** The refusal (shell hooks can't run on Windows — they shell
-  out to bash/python3) previously lived only in the verify gate, so `--no-verify`
-  silently wrote a non-runnable hook into `settings.json` and `--force` wrote it with
-  only a warning. The unrunnable hooks are now removed from the plan before install,
-  so a hook that cannot run never lands on any path (default / `--no-verify` /
-  `--force`); the install degrades to permissions-only, with the skip reported.
-  Platform-impossibility is not forceable — `--force` still overrides an ordinary
-  verification failure, but cannot will a shell hook into working on Windows. Because
-  the guardrails lock is written from the same filtered plan, `guardrails diff` now
-  correctly reports a refused hook as missing rather than falsely in-sync.
-
-### Fixed
 - **`risqlet setup` no longer crashes on a `CLAUDE.md` that an older risqlet wrote.**
   Making reads strict UTF-8 was right for what risqlet writes from now on and wrong
   for what was already on disk — including files risqlet itself wrote in cp1252
@@ -86,21 +120,6 @@ All notable changes to risqlet are documented here. The format follows
   `newline="\n"`, so a register or export written on Windows is byte-identical to
   one written on Linux. Python's text mode had been translating `\n` to `\r\n`,
   quietly making "deterministic output" untrue across platforms.
-
-### Added
-- **Cross-platform CI.** The `test` workflow now runs the full suite on Linux,
-  macOS, and Windows on every push and PR. Each platform also builds the wheel,
-  installs it into a fresh venv with no dev dependencies, and drives the real
-  `risqlet` console script from outside the repo — the first check of the artifact
-  users actually get, rather than the editable source install every test used
-  before. `risqlet setup` is smoke-tested for every agent adapter on every platform.
-  Platform differences are `posix_only` skips *inside* the suite, so they are
-  visible with a stated reason rather than omitted from a per-OS test selection.
-- Supported operating systems are now declared in `pyproject.toml` classifiers, and
-  a test ties them to the CI matrix — dropping a platform from CI fails that test
-  instead of leaving a stale promise on PyPI.
-
-### Fixed
 - **`detect()` no longer reports an agent as installed on the strength of a project
   directory.** Adapter dirs like `.claude` and `.github` resolve against the current
   working directory, so any repo containing one made setup report that agent as
@@ -128,31 +147,6 @@ All notable changes to risqlet are documented here. The format follows
   platform.** It read `$CLAUDE_TOOL_FILE_PATH`, an environment variable Claude Code
   does not set (the payload arrives as JSON on stdin), so the hook silently checked
   an empty path. It now emits the same command `setup` installs.
-
-### Added
-- `risqlet check --hook-input claude` reads a Claude Code hook payload from stdin
-  and checks the file it names. Distinct from `--stdin` (newline-separated paths),
-  which is unchanged. Because it runs inside an agent's edit loop it reports only
-  and always exits 0 — a malformed payload or an internal error is a silent no-op,
-  and `ci_gate: block` does not fail the edit. The gate's blocking behaviour is
-  unchanged for CI use.
-- A `test` CI workflow running the suite on Linux and the hook-related tests plus a
-  real `risqlet setup` on Windows, so the platform this bug occurred on is covered.
-
-### Changed
-- The release workflow is now **manually dispatched and mode-selectable**: a tag
-  push no longer publishes anything. Dispatching `release` with a tag and a mode
-  produces a draft GitHub release, a published GitHub release, or a full PyPI
-  publish — every mode builds, tests, and attaches the sdist + wheel to the
-  GitHub release. PyPI auth moved from Trusted Publishing (OIDC) to an API-token
-  secret (`PYPI_API_TOKEN`); the `pypi` mode fails fast until the secret is set.
-- Guardrail hooks are now **verified in the target environment** before install
-  (required tools on PATH, shell syntax, benign-passes/violation-caught behaviour,
-  timeout) and install is gated by default (`--no-verify` / `--force` to override);
-  new `risqlet guardrails verify`. Installed Claude Code hooks now carry the
-  **real** command (previously a `true` placeholder) and read the changed file
-  from Claude's stdin JSON payload. `coverage-check-stop` derives the project's
-  test command instead of hardcoding `make test`.
 
 ## [0.1.0] - 2026-07-11
 
@@ -183,5 +177,6 @@ repo-native `.risqlet/` register.
   accepted mitigations into risk-tagged coding-agent guardrails (hooks,
   AGENTS.md rules, permissions, pre-commit/CI) from a vetted template library.
 
-[Unreleased]: https://github.com/manykarim/risqlet/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/manykarim/risqlet/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/manykarim/risqlet/releases/tag/v0.2.0
 [0.1.0]: https://github.com/manykarim/risqlet/releases/tag/v0.1.0

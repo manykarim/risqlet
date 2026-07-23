@@ -1,6 +1,6 @@
 [project]
 name = "risqlet"
-version = "0.1.0"
+version = "0.2.0"
 description = "Agent-facing risk analysis, mitigation and test-strategy toolkit: repo-native risk register with a deterministic CLI core"
 readme = "README.md"
 requires-python = ">=3.12"

@@ -40,6 +40,36 @@ class TestMetadata:
         urls = pyproject()["project"]["urls"]
         assert "Repository" in urls and "Issues" in urls
 
+    def test_cli_reports_its_version(self):
+        """`--version` is the first thing a user tries after `pip install`."""
+        import subprocess
+        import sys as _sys
+
+        from risqlet import __version__
+
+        r = subprocess.run([_sys.executable, "-m", "risqlet.cli", "--version"],
+                           capture_output=True, text=True, encoding="utf-8", timeout=60)
+        # argparse's `version` action exits 0 and prints to stdout
+        assert r.returncode == 0, r.stderr
+        assert __version__ in r.stdout
+
+    def test_version_is_single_sourced(self):
+        """pyproject `version` and `risqlet.__version__` must not drift.
+
+        They are declared in two places, and `__version__` is written into every
+        `.risqlet/agents.lock` manifest — so a bump that missed one would ship a
+        wheel whose recorded version lies about itself.
+        """
+        from risqlet import __version__
+
+        assert pyproject()["project"]["version"] == __version__
+
+    def test_changelog_documents_current_version(self):
+        """A release must not ship a version the CHANGELOG never mentions."""
+        version = pyproject()["project"]["version"]
+        assert f"## [{version}]" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), \
+            f"CHANGELOG.md has no '## [{version}]' section"
+
     def test_os_claims_match_what_ci_runs(self):
         """spec: cross-platform-support — don't claim a platform CI doesn't run.
 
